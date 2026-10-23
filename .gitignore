@@ -1,0 +1,15 @@
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.pyc
+.DS_Store
+
+outputs/
+runs/
+wandb/
+checkpoints/
+*.log
