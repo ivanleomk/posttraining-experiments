@@ -8,7 +8,11 @@ from pathlib import Path
 from textwrap import dedent
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from generate_splits import extract
+from generate_splits import choose, extract
+from generate_tests import build_mutants, extract_check_function
+from launch_ablation import paired_bootstrap_ci, pass_at_k
+from nextlat import build_nextlat_mask
+from train_lora import parse_args as parse_train_args
 
 
 class ExtractTests(unittest.TestCase):
@@ -333,6 +337,100 @@ class ExtractTests(unittest.TestCase):
             self.assertIn("1 / 0", prompt)
             self.assertIn("raise RuntimeError", completion)
             self.assertFalse(marker.exists())
+
+    def test_choose_keeps_train_test_val_families_disjoint_and_preserves_prefix(self):
+        rows = [
+            {
+                "source_id": i,
+                "source_row": i,
+                "source_seed_sha1": f"seed-{i}",
+                "canonical_body_sha256": f"body-{i}",
+                "instruction_sha256": f"task-{i}",
+            }
+            for i in range(10)
+        ]
+        train_a, test_a, val_a, _ = choose(rows, train_size=4, test_size=2, seed=42, val_size=0)
+        train_b, test_b, val_b, _ = choose(rows, train_size=4, test_size=2, seed=42, val_size=3)
+        self.assertEqual(val_a, [])
+        self.assertEqual([r["source_id"] for r in train_a], [r["source_id"] for r in train_b])
+        self.assertEqual([r["source_id"] for r in test_a], [r["source_id"] for r in test_b])
+        self.assertEqual(len(val_b), 3)
+        families = [
+            {r["family_id"] for r in train_b},
+            {r["family_id"] for r in test_b},
+            {r["family_id"] for r in val_b},
+        ]
+        self.assertFalse(families[0] & families[1])
+        self.assertFalse(families[0] & families[2])
+        self.assertFalse(families[1] & families[2])
+
+    def test_extract_check_function_and_mutants(self):
+        valid = dedent(
+            """
+            ```python
+            def check(candidate):
+                assert candidate(2) == 4
+                assert candidate(0) == 0
+            ```
+            """
+        ).strip()
+        parsed = extract_check_function(valid)
+        self.assertIn("def check(candidate):", parsed)
+        for bad, reason in (
+            ("```python\ndef wrong(candidate):\n    assert candidate(1) == 1\n    assert candidate(2) == 2\n```", "invalid_check_signature"),
+            ("```python\ndef check(candidate):\n    assert candidate(1) == 1\n```", "insufficient_assertions"),
+            ("```python\ndef check(candidate):\n    import os\n    assert candidate(1) == 1\n    assert candidate(2) == 2\n```", "complex_or_external_dependencies"),
+        ):
+            with self.assertRaisesRegex(ValueError, f"^{reason}$"):
+                extract_check_function(bad)
+        mutants = build_mutants("def double(x):\n    'Double x.'\n", "    return x * 2\n")
+        self.assertIn("identity_first_arg", mutants["generic"])
+        self.assertTrue(any(k.startswith("ast_") for k in mutants["ast"]))
+
+    def test_train_config_and_paired_bootstrap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            train_file = root / "train.jsonl"
+            val_file = root / "val.jsonl"
+            train_file.write_text('{"split": "train"}\n')
+            val_file.write_text('{"split": "val"}\n')
+            cfg = parse_train_args(
+                [
+                    "--mode",
+                    "full",
+                    "--train",
+                    str(train_file),
+                    "--val",
+                    str(val_file),
+                    "--output",
+                    str(root / "out"),
+                    "--eval-benchmark",
+                    "humaneval",
+                ]
+            )
+            self.assertEqual(cfg.mode, "full")
+            self.assertEqual(cfg.eval_benchmarks, ["humaneval"])
+
+            base_res = root / "base_results.jsonl"
+            arm_res = root / "arm_results.jsonl"
+            base_res.write_text(
+                '{"task_id": "t1", "passed": false}\n{"task_id": "t2", "passed": true}\n'
+            )
+            arm_res.write_text(
+                '{"task_id": "t1", "passed": true}\n{"task_id": "t2", "passed": true}\n'
+            )
+            self.assertAlmostEqual(pass_at_k(20, 0, 1), 0.0)
+            self.assertAlmostEqual(pass_at_k(20, 20, 10), 1.0)
+            ci = paired_bootstrap_ci(base_res, arm_res, seed=42, resamples=500)
+            self.assertEqual(ci["tasks"], 2)
+            self.assertAlmostEqual(ci["pass@1"]["delta"], 0.5)
+
+    def test_nextlat_mask_contract(self):
+        ids = [10, 11, 20, 21, 22, 0]
+        labels = [-100, -100, 20, 21, 22, 0]
+        mask = build_nextlat_mask(ids, labels, eos_token_id=0)
+        self.assertEqual(mask, [False, True, True, True])
+        self.assertEqual(build_nextlat_mask([1, 0], [-100, 0], eos_token_id=0), [])
 
 
 if __name__ == "__main__":

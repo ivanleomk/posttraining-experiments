@@ -1,0 +1,49 @@
+{
+  "status": "complete",
+  "steps": 2500,
+  "config": {
+    "train": "/tmp/work/train.jsonl",
+    "val": "/tmp/work/val-100.jsonl",
+    "output": "/tmp/work/out",
+    "mode": "full",
+    "epochs": 1,
+    "learning_rate": 1e-05,
+    "accumulation": 4,
+    "val_every": 100,
+    "eval_benchmarks": [
+      "/tmp/work/test-100.jsonl",
+      "humaneval"
+    ],
+    "save_checkpoint": false,
+    "hf_repo": null,
+    "seed": 42,
+    "model": "EleutherAI/gpt-j-6b",
+    "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+    "train_sha256": "7af46dc5cd9a2eb47a28c498337100da3bc1ed3f8538bee9077bde6827e03ac8",
+    "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+    "examples": 10000,
+    "val_examples": 100,
+    "dtype": "torch.float32"
+  },
+  "final_metrics": {
+    "step": 2500,
+    "total_steps": 2500,
+    "epoch": 1,
+    "examples_seen": 10000,
+    "answer_token_nll": 0.27332513829442995,
+    "grad_norm": 3.4744207859039307,
+    "learning_rate": 0.0,
+    "val_answer_token_nll": 0.20595691944794098
+  },
+  "evaluations": {
+    "test_100": {
+      "pass@1": 0.38599999999999995,
+      "pass@10": 0.5188073459048692
+    },
+    "humaneval": {
+      "pass@1": 0.13628048780487803,
+      "pass@10": 0.18154867672537386
+    }
+  },
+  "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/zbewfhwz"
+}

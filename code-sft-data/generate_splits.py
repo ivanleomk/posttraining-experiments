@@ -192,9 +192,13 @@ class Groups:
 
 
 def choose(
-    rows: list[dict[str, Any]], train_size: int, test_size: int, seed: int
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
-    """Union related rows before deduplication, then reserve whole holdout families."""
+    rows: list[dict[str, Any]],
+    train_size: int,
+    test_size: int,
+    seed: int,
+    val_size: int = 0,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+    """Union related rows before deduplication, then reserve whole holdout and val families."""
     groups = Groups()
     for row in rows:
         keys = [
@@ -219,21 +223,33 @@ def choose(
     unique.sort(key=lambda r: digest(f"{seed}:{r['source_id']}:{r['source_row']}"))
     holdout = unique[:test_size]
     held_families = {r["family_id"] for r in holdout}
-    train = [r for r in unique[test_size:] if r["family_id"] not in held_families][
-        :train_size
-    ]
-    if len(holdout) != test_size or len(train) != train_size:
+    eligible = [r for r in unique[test_size:] if r["family_id"] not in held_families]
+    train = eligible[:train_size]
+    used_families = held_families | {r["family_id"] for r in train}
+    val: list[dict[str, Any]] = []
+    for row in eligible[train_size:]:
+        if len(val) == val_size:
+            break
+        if row["family_id"] not in used_families:
+            used_families.add(row["family_id"])
+            val.append(row)
+    if len(holdout) != test_size or len(train) != train_size or len(val) != val_size:
         raise ValueError(
-            f"Insufficient eligible examples: train={len(train)}, holdout={len(holdout)}"
+            f"Insufficient eligible examples: train={len(train)}, holdout={len(holdout)}, val={len(val)}"
         )
-    assert not ({r["family_id"] for r in train} & held_families)
+    train_families = {r["family_id"] for r in train}
+    val_families = {r["family_id"] for r in val}
+    assert not (train_families & held_families)
+    assert not (val_families & (train_families | held_families))
     return (
         train,
         holdout,
+        val,
         dict(
             unique_candidates=len(unique),
             duplicate_bodies_removed=len(rows) - len(unique),
             holdout_families=len(held_families),
+            val_families=len(val_families),
             unused_holdout_family_rows=sum(
                 r["family_id"] in held_families for r in unique[test_size:]
             ),
@@ -261,6 +277,7 @@ class SplitConfig(BaseModel):
     seed: int = 42
     train_size: int = Field(default=10000, ge=1000)
     test_size: int = Field(default=100, ge=1)
+    val_size: int = Field(default=200, ge=0)
 
 
 def parse_args(argv: list[str] | None = None) -> SplitConfig:
@@ -270,6 +287,7 @@ def parse_args(argv: list[str] | None = None) -> SplitConfig:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--train-size", type=int, default=10000)
     parser.add_argument("--test-size", type=int, default=100)
+    parser.add_argument("--val-size", type=int, default=200)
     try:
         return SplitConfig.model_validate(vars(parser.parse_args(argv)))
     except ValidationError as error:
@@ -411,19 +429,23 @@ def save_splits(
     source_rows: int,
     candidate_count: int,
 ) -> dict[str, Any]:
-    train, test, selection = choose(
-        accepted, config.train_size, config.test_size, config.seed
+    train, test, val, selection = choose(
+        accepted, config.train_size, config.test_size, config.seed, config.val_size
     )
     for row in train:
         row["split"] = "train"
     for row in test:
         row["split"] = "test"
+    for row in val:
+        row["split"] = "val"
     pools = {
         "train-100": train[:100],
         "train-1000": train[:1000],
         f"train-{config.train_size}": train,
-        "test-100" if config.test_size == 100 else f"test-{config.test_size}": test,
+        f"test-{config.test_size}": test,
     }
+    if val:
+        pools[f"val-{config.val_size}"] = val
     config.output.parent.mkdir(exist_ok=True, parents=True)
     staging = Path(tempfile.mkdtemp(prefix=".splits-", dir=config.output.parent))
     try:

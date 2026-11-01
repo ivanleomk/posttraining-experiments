@@ -1,0 +1,56 @@
+{
+  "status": "complete",
+  "steps": 25,
+  "config": {
+    "train": "/tmp/work/train.jsonl",
+    "val": "/tmp/work/val-100.jsonl",
+    "output": "/tmp/work/out",
+    "mode": "full",
+    "objective": "nextlat",
+    "lambda_mse": 1.0,
+    "lambda_kl": 1.0,
+    "proj_factor": 0.5,
+    "epochs": 1,
+    "learning_rate": 1e-05,
+    "accumulation": 4,
+    "val_every": 5,
+    "eval_benchmarks": [
+      "/tmp/work/test-100.jsonl",
+      "humaneval"
+    ],
+    "save_checkpoint": false,
+    "hf_repo": null,
+    "seed": 42,
+    "model": "EleutherAI/gpt-j-6b",
+    "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+    "train_sha256": "75dac0b06470a10414f2f7f2a076e5414d8d9e8f97b02cf9d4f5518d4c638724",
+    "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+    "examples": 100,
+    "val_examples": 100,
+    "dtype": "torch.float32"
+  },
+  "final_metrics": {
+    "step": 25,
+    "total_steps": 25,
+    "epoch": 1,
+    "examples_seen": 100,
+    "answer_token_nll": 0.7167062423097978,
+    "grad_norm": 11.3477783203125,
+    "learning_rate": 0.0,
+    "nextlat_mse_loss": 0.49063892307084633,
+    "nextlat_kl_loss": 1.2713668931514845,
+    "total_loss": 2.4787120840965065,
+    "val_answer_token_nll": 0.5932820498936502
+  },
+  "evaluations": {
+    "test_100": {
+      "pass@1": 0.0795,
+      "pass@10": 0.14692659507674988
+    },
+    "humaneval": {
+      "pass@1": 0.013109756097560979,
+      "pass@10": 0.02877935513101261
+    }
+  },
+  "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/pcarpa37"
+}

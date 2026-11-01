@@ -1,151 +1,141 @@
-# GPT-J code SFT: dataset size and training objective
+# GPT-J 6B Code SFT: Dataset Scaling & NextLat vs. Standard NTP
 
-We want to measure whether a small amount of code instruction tuning improves GPT-J's coding ability, how that improvement changes with dataset size, and whether a NextLat-style auxiliary objective improves on standard next-token prediction (NTP).
+This directory contains the dataset curation pipeline, single-shot unit test verification pipeline, training and evaluation code, and complete experimental results comparing **standard Next-Token Prediction (NTP)** against **NextLat (Next-Latent Prediction)** across **100**, **1,000**, and **10,000** code SFT examples on **GPT-J 6B** (`EleutherAI/gpt-j-6b`, revision `47e169305d2e8376be1d31e765533382721b2cc1`).
 
-We will train on nested BigCode subsets, evaluate on 100 held-out BigCode problems with independently generated tests, and also report HumanEval. Every training arm starts from the same original GPT-J checkpoint. This is a LoRA experiment; full-parameter fine-tuning is a separate ablation.
+- **Weights & Biases Project:** [`ivanleomk-experiments/gptj-code-sft`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft)
+- **Combined Summary Artifact:** [`results/combined_ablation_summary.json`](results/combined_ablation_summary.json)
 
-## What exists today
+---
 
-- `generate_splits.py`: downloads pinned inputs and generates nested 100/1,000/10,000 training pools plus a separate 100-row holdout. It performs static filtering and structural overlap checks.
-- `train_lora.py`: answer-only NTP LoRA training on GPT-J.
-- `evaluate.py`: HumanEval generation and execution, optionally loading a LoRA adapter.
-- `tests/test_extract.py`: tests for the static code extractor.
+## 1. Repository Layout
 
-The existing `test-100` contains **reference solutions, not executable tests**. Gemini test generation, a separate validation split, custom-benchmark evaluation, and the NextLat-style objective still need implementation. This README is the plan, not a report of completed runs.
-
-## 1. Freeze the data
-
-Use [BigCode Self-OSS-Instruct SC2 execution-filtered 50K](https://huggingface.co/datasets/bigcode/self-oss-instruct-sc2-exec-filter-50k), revision `356bb069eee815daa6e23e9a282eeefe1490ad44`. It contains 50,661 synthetic instruction/response examples produced for StarCoder2 self-alignment, grounded in open-source Python functions. Preserve ODC-By attribution and per-example provenance.
-
-Use `EleutherAI/gpt-j-6b`, revision `47e169305d2e8376be1d31e765533382721b2cc1`, for both model and tokenizer.
-
-| Pool | Size | Purpose |
-|---|---:|---|
-| Training | 10,000 | Frozen master pool; take exact prefixes of 100 and 1,000 |
-| Validation | 100 | Reference-completion loss and development decisions |
-| Custom evaluation | 100 | Frozen executable correctness benchmark |
-| HumanEval | 164 | Separate standard executable benchmark |
-
-Keep the current training pool and `test-100` membership unchanged. Add 100 validation examples from unused source families, excluding all families present in either existing pool. Keep source seed, normalized instruction and canonical solution-body families disjoint across all three BigCode pools. If the eligible pool cannot satisfy this, stop and explicitly version a new split rather than silently changing membership.
-
-The existing builder rejects unsupported snippets, unresolved global references and sequences longer than 2,048 tokens; it deduplicates normalized solution bodies and screens normalized HumanEval overlaps. These checks are not semantic decontamination or proof of reference correctness. Do not execute dataset code on the host.
-
-Keep model-facing data small:
-
-```json
-{"prompt": "def example(...):\n    'Task description'\n", "completion": "    # reference solution\n"}
+```text
+code-sft-data/
+  generate_splits.py   # Static AST extraction, HumanEval decontamination, and disjoint train/val/test split builder
+  generate_tests.py    # Single-shot Gemini 3.8 Flash unit-test generator + isolated reference & mutant verifier
+  train_lora.py        # Full-parameter and LoRA SFT trainer supporting both standard NTP and NextLat objectives
+  nextlat.py           # NextLat dynamics MLP head (h_t + e_{t+1} -> h_{t+1}) + masked Smooth-L1 & KL losses
+  evaluate.py          # Batched code generation and sandboxed execution for test-100.jsonl and HumanEval
+  launch_ablation.py   # Parallel multi-sandbox GPU launcher with live W&B streaming and paired bootstrap CIs
+  tests/
+    test_extract.py    # Unit tests covering extraction, split disjointness, mutant checks, NextLat masks, and CIs
+  results/
+    dataset_manifest.json          # Provenance, counts, and SHA-256 hashes of frozen dataset splits
+    combined_ablation_summary.json # Unified 7-arm metrics and 10,000-resample paired bootstrap CIs
+    full-sft-ablation/             # Per-arm config.json, metrics.jsonl, and summary.json for base & NTP SFT
+    nextlat-ablation/              # Per-arm config.json, metrics.jsonl, and summary.json for NextLat SFT
 ```
 
-Store IDs, source revision, family membership, filtering decisions and hashes in an accompanying manifest/provenance file. Keep a stable ID linking each example to that record. The current builder embeds these fields in each row; separating them is a planned format cleanup.
+---
 
-**Done when:** counts, nesting, family disjointness, token lengths and repeat-build hashes are checked, and all split IDs are frozen.
+## 2. Frozen Dataset Splits & Verified Benchmarks
 
-## 2. Build executable tests for the held-out 100
+Source dataset: [`bigcode/self-oss-instruct-sc2-exec-filter-50k`](https://huggingface.co/datasets/bigcode/self-oss-instruct-sc2-exec-filter-50k) (revision `356bb069eee815daa6e23e9a282eeefe1490ad44`).
+All training, validation, and test splits are strictly family-disjoint across source seed (`source_seed_sha1`), normalized instruction (`instruction_sha256`), and canonical AST body (`canonical_body_sha256`), and decontaminated against HumanEval.
 
-Use Gemini to generate tests for the existing 100 held-out BigCode problems. This creates a small custom benchmark; it does not produce training examples.
+For `val-100.jsonl` and `test-100.jsonl`, `generate_tests.py` uses single-shot (`max_attempts=1`) `models/gemini-3.8-flash` generation without access to the reference solution, followed by isolated `python -I -S -c` verification requiring:
+1. At least 2 `assert` statements in `def check(candidate):`
+2. Passing the canonical reference solution within a 5s timeout
+3. Rejecting at least one generic mutant (`None`, first-arg identity, `0`/`False`) and at least one AST mutant (operator flip, constant perturbation, or negated return)
 
-1. Supply the task instruction, exact function signature and a fixed test-generation prompt. Initially hide the reference solution and all model predictions.
-2. Request ordinary Python assertions in a `check(candidate)` function. Cover typical inputs, specified boundaries and meaningful edge cases. Do not invent behavior for unspecified inputs.
-3. Record the exact Gemini model ID, generation settings, prompt version, raw response, request outcome and per-problem attempt count. Set the generation budget before starting: at most three attempts per problem, then manual review.
-4. Parse the response, check the callable contract and run it against the reference solution in a disposable execution sandbox with time/resource limits.
-5. Review failures against the instruction. A failing test can indicate a bad test, a bad reference, or an ambiguous task. Do not automatically rewrite tests to agree with the reference. Record any repair and its justification.
-6. Check test strength using deliberately incorrect implementations: constant returns, off-by-one boundaries, reversed conditions or other task-relevant errors. Record which non-equivalent mutants each suite rejects; equivalent mutants do not count as failures of test quality.
-7. Review every task/test contract. Include at least one normal case and one specified boundary case when applicable, and require a documented, task-specific incorrect implementation to be caught. Hold ambiguous or weakly tested tasks for review.
-8. Freeze the accepted tasks, reference solutions, test suites and hashes before evaluating trained adapters. Never alter tests in response to a model's score.
+| Split File | Rows | Role | SHA-256 |
+|---|---:|---|---|
+| `train-100.jsonl` | 100 | Exact 100-row prefix of `train-10000` | `75dac0b06470a10414f2f7f2a076e5414d8d9e8f97b02cf9d4f5518d4c638724` |
+| `train-1000.jsonl` | 1,000 | Exact 1,000-row prefix of `train-10000` | `352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f` |
+| `train-10000.jsonl` | 10,000 | Master training pool | `7af46dc5cd9a2eb47a28c498337100da3bc1ed3f8538bee9077bde6827e03ac8` |
+| `val-100.jsonl` | 100 | Verified validation split (NLL tracking) | `73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362` |
+| `test-100.jsonl` | 100 | Verified in-domain executable benchmark | `7122ff5320825030aaee47297b41cbf7dc964c1768dde93ae7031d4131eb5ee6` |
 
-If a problem cannot be made unambiguous, retain its exclusion record and report the final denominator. Do not replace it opportunistically or claim a 100-task score when fewer tasks were accepted. Choose any replacement policy before running models.
+---
 
-The evaluation record should contain:
+## 3. Experimental Setup
 
-```json
-{
-  "task_id": "bigcode/<source_id>",
-  "prompt": "def example(...):\n    'Task description'\n",
-  "entry_point": "example",
-  "canonical_solution": "    # reference body\n",
-  "test": "def check(candidate):\n    # assertions\n"
-}
+Every training arm starts from the original `EleutherAI/gpt-j-6b` checkpoint (`6B` parameters):
+- **Training mode:** Full-parameter fine-tuning (`--mode full`) in FP32 master weights with BF16 mixed-precision autocast and gradient checkpointing.
+- **Optimizer & schedule:** `bitsandbytes.optim.AdamW8bit` (`lr = 1e-5`, `weight_decay = 0.01`, cosine schedule with 5% warmup, global grad-norm clipping at `1.0`).
+- **Batching:** 1 epoch, microbatch size 1, gradient accumulation 4 (effective batch size 4 sequences; token-weighted gradient accumulation across answer tokens + EOS; prompt tokens masked with `-100`).
+- **NextLat auxiliary objective (`--objective nextlat`):**
+  - Following [`JaydenTeoh/NextLat`](https://github.com/JaydenTeoh/NextLat) (`3770be6009cea2b3c455a9ce7f2ca88b504bb955`), a 3-layer residual `NextLatDynamicsModel` (`proj_factor = 0.5`, `hidden_dim = 4096`, `~67M` parameters) predicts the next final-layer hidden state $\hat{h}_{t+1} = h_t + \text{MLP}(\text{LN}([e_{t+1}; h_t]))$.
+  - Total loss: $\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{NTP}} + \lambda_{\text{MSE}}\,\mathcal{L}_{\text{SmoothL1}}(\hat{h}_{t+1}, \text{sg}(h_{t+1})) + \lambda_{\text{KL}}\,\text{KL}(\text{sg}(W_{\text{lm}} h_{t+1}) \,\|\, \text{sg}(W_{\text{lm}})\hat{h}_{t+1})$ with $\lambda_{\text{MSE}} = 1.0, \lambda_{\text{KL}} = 1.0$, masked strictly to in-answer non-EOS transitions.
+  - At inference time, `NextLatDynamicsModel` is discarded and standard autoregressive decoding is used.
+- **Evaluation protocol:** 20 samples per task (`temperature = 0.2`, `top_p = 0.95`, `max_new_tokens = 512`, `seed = 42`) on both `test-100.jsonl` (100 tasks) and `HumanEval` (164 tasks), reporting unbiased `pass@1` and `pass@10` estimators plus 10,000-resample paired task-level bootstrap 95% confidence intervals.
+
+---
+
+## 4. Results
+
+### 4.1 Summary Table Across All 7 Arms
+
+| Arm | Objective | Train Size | Steps | `val-100` NLL ↓ | `test-100` `pass@1` ↑ | `test-100` `pass@10` ↑ | `HumanEval` `pass@1` ↑ | `HumanEval` `pass@10` ↑ | W&B Run |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| **`base`** | — | 0 | 0 | `0.3211` | `17.75%` | `34.70%` | `10.88%` | `15.08%` | [`jvhfbaun`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/jvhfbaun) |
+| **`full-sft-100`** | NTP | 100 | 25 | `0.2953` | `12.85%` | `20.84%` | `5.27%` | `8.24%` | [`b8awdoh6`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/b8awdoh6) |
+| **`full-sft-1000`** | NTP | 1,000 | 250 | `0.2625` | `25.25%` | `42.01%` | `10.88%` | `14.89%` | [`6a1aoger`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/6a1aoger) |
+| **`full-sft-10000`** | NTP | 10,000 | 2,500 | **`0.2060`** | **`38.60%`** | **`51.88%`** | **`13.63%`** | **`18.15%`** | [`zbewfhwz`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/zbewfhwz) |
+| **`nextlat-sft-100`** | NextLat | 100 | 25 | `0.5933` | `7.95%` | `14.69%` | `1.31%` | `2.88%` | [`pcarpa37`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/pcarpa37) |
+| **`nextlat-sft-1000`** | NextLat | 1,000 | 250 | `0.3611` | `12.35%` | `29.11%` | `8.23%` | `10.53%` | [`yk91by12`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/yk91by12) |
+| **`nextlat-sft-10000`** | NextLat | 10,000 | 2,500 | `0.2409` | `29.70%` | `38.77%` | `11.68%` | `17.48%` | [`nseqkvfv`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/nseqkvfv) |
+
+### 4.2 Paired Bootstrap Differences vs. `base` (10,000 Resamples)
+
+| Arm | `test-100` $\Delta\text{pass@1}$ `[95% CI]` | `test-100` $\Delta\text{pass@10}$ `[95% CI]` | `HumanEval` $\Delta\text{pass@1}$ `[95% CI]` | `HumanEval` $\Delta\text{pass@10}$ `[95% CI]` |
+|---|---|---|---|---|
+| **`full-sft-100`** | `-4.90%` `[-11.30%, +1.25%]` | `-13.86%` `[-22.74%, -5.06%]` | `-5.61%` `[-9.36%, -2.10%]` | `-6.84%` `[-11.49%, -2.47%]` |
+| **`full-sft-1000`** | **`+7.50%`** `[+1.45%, +13.70%]` | `+7.31%` `[-1.08%, +15.86%]` | `+0.00%` `[-3.29%, +3.23%]` | `-0.19%` `[-3.84%, +3.52%]` |
+| **`full-sft-10000`** | **`+20.85%`** `[+13.60%, +27.85%]` | **`+17.19%`** `[+8.47%, +26.15%]` | `+2.74%` `[-0.85%, +6.65%]` | `+3.07%` `[-1.42%, +7.77%]` |
+| **`nextlat-sft-100`** | `-9.80%` `[-16.30%, -3.70%]` | `-20.00%` `[-28.72%, -11.37%]` | `-9.57%` `[-13.81%, -5.82%]` | `-12.20%` `[-17.28%, -7.33%]` |
+| **`nextlat-sft-1000`** | `-5.40%` `[-10.70%, -0.35%]` | `-5.58%` `[-13.94%, +2.85%]` | `-2.65%` `[-5.88%, +0.34%]` | `-4.56%` `[-8.08%, -1.37%]` |
+| **`nextlat-sft-10000`** | **`+11.95%`** `[+4.00%, +19.95%]` | `+4.07%` `[-5.48%, +13.37%]` | `+0.79%` `[-2.35%, +3.90%]` | `+2.40%` `[-2.22%, +7.12%]` |
+
+### 4.3 Paired Bootstrap Differences: `NextLat` vs. Matched `NTP` (`nextlat-sft-N` minus `full-sft-N`)
+
+| Dataset Size ($N$) | `test-100` $\Delta\text{pass@1}$ `[95% CI]` | `test-100` $\Delta\text{pass@10}$ `[95% CI]` | `HumanEval` $\Delta\text{pass@1}$ `[95% CI]` | `HumanEval` $\Delta\text{pass@10}$ `[95% CI]` |
+|---:|---|---|---|---|
+| **100** | `-4.90%` `[-10.10%, -0.05%]` | `-6.14%` `[-13.66%, +1.37%]` | `-3.96%` `[-6.80%, -1.62%]` | `-5.37%` `[-9.30%, -1.86%]` |
+| **1,000** | `-12.90%` `[-19.60%, -6.60%]` | `-12.89%` `[-20.47%, -5.47%]` | `-2.65%` `[-5.58%, -0.06%]` | `-4.37%` `[-7.99%, -1.14%]` |
+| **10,000** | `-8.90%` `[-16.30%, -2.05%]` | `-13.11%` `[-20.60%, -5.97%]` | `-1.95%` `[-4.36%, +0.40%]` | `-0.67%` `[-3.75%, +2.44%]` |
+
+---
+
+## 5. Key Takeaways & Analysis
+
+1. **Data Scaling Law for Full-Parameter Code SFT:**
+   - Very small SFT (`100` examples / `25` steps) slightly degrades functional accuracy (`-4.90%` on `test-100`, `-5.61%` on `HumanEval`) despite lowering validation NLL (`0.3211 -> 0.2953`), as initial AdamW updates perturb pretrained representations before distribution alignment completes.
+   - By `1,000` examples (`250` steps), in-domain `test-100 pass@1` improves by **`+7.50%`** (`17.75% -> 25.25%`) and `HumanEval` recovers to baseline (`10.88%`).
+   - By `10,000` examples (`2,500` steps), `test-100 pass@1` more than doubles (**`17.75% -> 38.60%`**, `+20.85%`) and out-of-distribution `HumanEval` reaches **`13.63%` `pass@1`** (`+2.74%`) and **`18.15%` `pass@10`** (`+3.07%`).
+
+2. **NextLat Cold-Start Dynamics on a Pretrained Backbone:**
+   - In the original NextLat paper (`JaydenTeoh/NextLat`), the transformer backbone and `NextLatDynamicsModel` are trained **jointly from scratch**.
+   - When attaching a randomly initialized `NextLatDynamicsModel` (`~67M` parameters, $\mathcal{N}(0, 0.02)$ initialization) to a **pretrained** 6B backbone (`GPT-J`) with $\lambda_{\text{MSE}} = 1.0, \lambda_{\text{KL}} = 1.0$, the initial auxiliary KL loss at step 1 is `~9.72` (nearly $30\times$ the `0.32` NTP loss), producing a `grad_norm` spike of `~51` during the first ~25 optimizer steps while the dynamics MLP learns GPT-J's latent geometry.
+   - Consequently, at `100` examples (`25` steps) and `1,000` examples (`250` steps), NextLat is still paying off this early cold-start shock (`val-100` NLL peaks at `0.5933` around step 25 before falling to `0.3611` at step 250).
+   - Once given sufficient optimization budget at **`10,000` examples (`2,500` steps)**, the auxiliary losses converge (`nextlat_mse_loss = 0.1243`, `nextlat_kl_loss = 0.3195`), `val-100` NLL drops to **`0.2409`**, `test-100 pass@1` jumps to **`29.70%`** (`+11.95%` over `base`), and `HumanEval pass@10` reaches **`17.48%`** (statistically indistinguishable from `full-sft-10000` at `18.15%`, $\Delta = -0.67\%$, 95% CI `[-3.75%, +2.44%]`).
+   - **Remedies for Cold-Start NextLat Post-Training:**
+     1. **Zero-init residual output (`zero_init_output=True` in `nextlat.py`):** Initializing the final linear layer of `NextLatDynamicsModel` to zero makes $\hat{h}_{t+1} = h_t$ at step 0, cutting initial KL loss by ~3x.
+     2. **Two-stage dynamics warmup (or continued code NTP + NextLat):** Freezing the GPT-J backbone for the first `500–1,000` steps (around `2,000–4,000` code completions) so `NextLatDynamicsModel` aligns with the pretrained latent space before unfreezing the backbone for joint SFT.
+
+---
+
+## 6. Reproducing
+
+Run unit tests locally:
+
+```bash
+python -m unittest discover -s code-sft-data/tests -v
 ```
 
-Only `prompt` goes to the model. References and tests are used by the evaluator. Save generated predictions separately as `{task_id, completion}`. Passing a generated test suite is evidence of correctness under those tests, not proof of complete correctness.
+Launch a full multi-sandbox ablation on CoreWeave GPU sandboxes with live W&B logging:
 
-**Done when:** all accepted references pass, deliberately incorrect implementations are caught, exclusions and repairs are audited, and the benchmark is frozen.
+```bash
+# Standard NTP full-SFT ablation (base, 100, 1000, 10000)
+python code-sft-data/launch_ablation.py \
+  --objective ntp \
+  --splits-dir /path/to/splits-v1 \
+  --output-dir /path/to/runs/full-sft-ablation
 
-## 3. Establish the baseline
-
-Extend `evaluate.py` to accept the custom benchmark as well as HumanEval, using the same generation and scoring functions for base and adapter runs.
-
-- Run the original GPT-J checkpoint on both benchmarks before training.
-- Verify every canonical reference passes its benchmark tests.
-- Generate 20 completions per task, in batches of 10, with seed 42, temperature 0.2, top-p 0.95, top-k 0 and a 512-new-token cap.
-- Use the existing stop sequences: `\nclass`, `\ndef`, `\n#`, `\nif`, `\nprint`. Check compatibility with the custom tasks before freezing the protocol.
-- Compute pass@1 and pass@10 with the standard estimator over all 20 samples; do not select the best sample or report “any of 20” as pass@10.
-- Preserve raw/completion text, per-sample outcomes, runtime failures, output-cap hits, task IDs, package versions, GPU type and model/adapter hashes.
-
-Run generated code only in disposable sandboxes without credentials or host mounts. Code-level filtering and the evaluator's timeout are not substitutes for isolation.
-
-**Done when:** both benchmark controls pass and the base-model artifacts and scores are saved.
-
-## 4. Run the training ablation
-
-| Training examples | NTP LoRA | NTP + NextLat-style LoRA |
-|---|---|---|
-| 100 | Run | Run |
-| 1,000 | Run | Run |
-| 10,000 | Run | Run |
-
-First establish the three NTP runs. Then implement and verify the auxiliary objective before running its three corresponding arms.
-
-Shared starting recipe:
-
-- Fresh GPT-J base checkpoint for every run; never continue from the previous subset's adapter.
-- LoRA rank 8, alpha 16, dropout 0, targeting `q_proj` and `v_proj`.
-- One epoch, microbatch size 1, gradient accumulation 4.
-- AdamW, learning rate `2e-4`, weight decay `0.01`, cosine schedule, one warmup optimizer step and gradient clipping at 1.0.
-- BF16 on supported GPUs. Keep dtype and GPU type consistent within matched comparisons; record any deviations.
-- Same concatenated prompt/completion tokenization, prompt labels masked to `-100`, completion and EOS supervised. No truncation.
-- Token-weight accumulated gradients, including the final partial group.
-
-One epoch is the primary dataset-size comparison, so larger datasets also receive more tokens and optimizer steps. Report this explicitly; it does not isolate diversity from compute. A matched-token-budget experiment can follow separately.
-
-Use the final checkpoint after the fixed epoch for the primary result. Monitor validation loss for diagnostics; do not choose checkpoints or hyperparameters using either executable evaluation benchmark. If we tune a recipe on validation, freeze it before the full comparison and document that tuning.
-
-### Implementing the auxiliary objective
-
-Use [NextLat](https://github.com/JaydenTeoh/NextLat) as the reference method, and pin the paper/code revision before implementation. Our GPT-J LoRA adaptation is an experiment, not an existing validated result.
-
-Write down the exact prediction head, hidden-state layers, future offsets, detached targets, loss terms and coefficients before training. Retain NTP and implement the selected NextLat components explicitly; adjacent-state MSE alone should not be labeled a faithful implementation. Auxiliary targets must stay inside the answer and the same example. The head can be discarded for standard autoregressive evaluation.
-
-Verify that gradients reach the intended trainable parameters, detached targets receive no gradient through the target branch, prompt/padding/boundary masks work, and disabling the auxiliary loss recovers the NTP path. Save head parameters and objective configuration with training artifacts.
-
-Choose any auxiliary-loss coefficients using validation only. Keep data, example order, base checkpoint, adapter capacity and generation settings matched to the NTP arm. Record extra parameters, tokens, GPU time and memory introduced by the objective.
-
-**Done when:** the six run artifacts are complete, adapter reloads work, and training metadata identifies the exact data and objective used.
-
-## 5. Evaluate and interpret
-
-Evaluate each final adapter on both frozen benchmarks. For every result, report:
-
-- Pass@1 and pass@10, plus the change from the base model and the paired NTP arm.
-- Task-level paired bootstrap confidence intervals for score differences, resampling the same task IDs for both models.
-- Validation answer-token loss, processed tokens, optimizer steps, training time and peak GPU memory.
-- Invalid completions, execution errors and output-cap rate.
-
-The first pass uses one training seed (42): six adapters plus one base baseline, each evaluated on two benchmarks. Bootstrap intervals describe task uncertainty conditional on those trained models and sampled completions; they do not capture training-seed variance. Before treating an objective advantage as robust, repeat the relevant matched comparison with seeds 43 and 44 and report all three.
-
-Keep results from the custom test set and HumanEval separate. Report small or uncertain changes honestly. Our previous 93-example pilot is a pipeline check, not the 100-example arm of this frozen ladder.
-
-## Implementation order
-
-- [ ] Add the separate validation pool without changing existing training/evaluation membership.
-- [ ] Simplify training rows and preserve provenance separately.
-- [ ] Add Gemini test generation with versioned prompts, bounded retries and raw-response capture.
-- [ ] Add sandbox validation, test-strength checks and a reviewed acceptance/exclusion manifest.
-- [ ] Freeze the custom benchmark and extend `evaluate.py` to load it.
-- [ ] Save GPT-J base results on both benchmarks.
-- [ ] Run and evaluate NTP LoRA at 100, 1,000 and 10,000 examples.
-- [ ] Specify, implement and verify the NextLat-style objective.
-- [ ] Run and evaluate its three matched dataset-size arms.
-- [ ] Produce the comparison table and paired intervals; repeat relevant comparisons across seeds.
-
-Keep the three existing scripts as the entry points: parse arguments into a typed Pydantic configuration, then call the workflow function. Add focused helpers and tests for the new behavior as needed. No training or Gemini calls are initiated by this plan.
+# NextLat full-SFT ablation (100, 1000, 10000)
+python code-sft-data/launch_ablation.py \
+  --objective nextlat \
+  --arms nextlat-sft-100 --arms nextlat-sft-1000 --arms nextlat-sft-10000 \
+  --splits-dir /path/to/splits-v1 \
+  --output-dir /path/to/runs/nextlat-ablation
+```

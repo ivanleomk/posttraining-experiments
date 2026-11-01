@@ -1,0 +1,26 @@
+{"step": 0, "total_steps": 25, "epoch": 0, "examples_seen": 0, "val_answer_token_nll": 0.3211747467852365}
+{"step": 1, "total_steps": 25, "epoch": 1, "examples_seen": 4, "answer_token_nll": 0.35034124771753944, "grad_norm": 4.123426914215088, "learning_rate": 1e-05}
+{"step": 2, "total_steps": 25, "epoch": 1, "examples_seen": 8, "answer_token_nll": 0.5001120184706809, "grad_norm": 6.780261039733887, "learning_rate": 9.957224306869053e-06}
+{"step": 3, "total_steps": 25, "epoch": 1, "examples_seen": 12, "answer_token_nll": 0.22080055597525106, "grad_norm": 3.54388689994812, "learning_rate": 9.829629131445342e-06}
+{"step": 4, "total_steps": 25, "epoch": 1, "examples_seen": 16, "answer_token_nll": 0.22789407642226917, "grad_norm": 3.3459811210632324, "learning_rate": 9.619397662556434e-06}
+{"step": 5, "total_steps": 25, "epoch": 1, "examples_seen": 20, "answer_token_nll": 0.2179937412601491, "grad_norm": 4.513242721557617, "learning_rate": 9.330127018922195e-06, "val_answer_token_nll": 0.3108381044617525}
+{"step": 6, "total_steps": 25, "epoch": 1, "examples_seen": 24, "answer_token_nll": 0.33420326226744157, "grad_norm": 7.971375942230225, "learning_rate": 8.966766701456177e-06}
+{"step": 7, "total_steps": 25, "epoch": 1, "examples_seen": 28, "answer_token_nll": 0.3170313329263857, "grad_norm": 9.442797660827637, "learning_rate": 8.535533905932739e-06}
+{"step": 8, "total_steps": 25, "epoch": 1, "examples_seen": 32, "answer_token_nll": 0.46303240342720137, "grad_norm": 8.452105522155762, "learning_rate": 8.043807145043604e-06}
+{"step": 9, "total_steps": 25, "epoch": 1, "examples_seen": 36, "answer_token_nll": 0.3201935152072862, "grad_norm": 5.926551342010498, "learning_rate": 7.500000000000001e-06}
+{"step": 10, "total_steps": 25, "epoch": 1, "examples_seen": 40, "answer_token_nll": 0.4520885121127415, "grad_norm": 8.321714401245117, "learning_rate": 6.913417161825449e-06, "val_answer_token_nll": 0.323313709590791}
+{"step": 11, "total_steps": 25, "epoch": 1, "examples_seen": 44, "answer_token_nll": 0.5601345454824381, "grad_norm": 8.361300468444824, "learning_rate": 6.294095225512604e-06}
+{"step": 12, "total_steps": 25, "epoch": 1, "examples_seen": 48, "answer_token_nll": 0.33356597855014647, "grad_norm": 3.9679837226867676, "learning_rate": 5.65263096110026e-06}
+{"step": 13, "total_steps": 25, "epoch": 1, "examples_seen": 52, "answer_token_nll": 0.29484654645627156, "grad_norm": 4.857996463775635, "learning_rate": 5e-06}
+{"step": 14, "total_steps": 25, "epoch": 1, "examples_seen": 56, "answer_token_nll": 0.3373412799231614, "grad_norm": 5.719766616821289, "learning_rate": 4.347369038899744e-06}
+{"step": 15, "total_steps": 25, "epoch": 1, "examples_seen": 60, "answer_token_nll": 0.3102935409412704, "grad_norm": 4.286654949188232, "learning_rate": 3.705904774487396e-06, "val_answer_token_nll": 0.30684453525462385}
+{"step": 16, "total_steps": 25, "epoch": 1, "examples_seen": 64, "answer_token_nll": 0.21397256323446828, "grad_norm": 3.6401734352111816, "learning_rate": 3.0865828381745515e-06}
+{"step": 17, "total_steps": 25, "epoch": 1, "examples_seen": 68, "answer_token_nll": 0.2664625829271608, "grad_norm": 3.5509166717529297, "learning_rate": 2.5000000000000015e-06}
+{"step": 18, "total_steps": 25, "epoch": 1, "examples_seen": 72, "answer_token_nll": 0.21093352826509046, "grad_norm": 3.2929255962371826, "learning_rate": 1.956192854956397e-06}
+{"step": 19, "total_steps": 25, "epoch": 1, "examples_seen": 76, "answer_token_nll": 0.26096209187042885, "grad_norm": 3.1772003173828125, "learning_rate": 1.4644660940672628e-06}
+{"step": 20, "total_steps": 25, "epoch": 1, "examples_seen": 80, "answer_token_nll": 0.2722170203924179, "grad_norm": 4.109030246734619, "learning_rate": 1.0332332985438248e-06, "val_answer_token_nll": 0.2979383528780424}
+{"step": 21, "total_steps": 25, "epoch": 1, "examples_seen": 84, "answer_token_nll": 0.36850802605539873, "grad_norm": 3.976592779159546, "learning_rate": 6.698729810778065e-07}
+{"step": 22, "total_steps": 25, "epoch": 1, "examples_seen": 88, "answer_token_nll": 0.30650321293726523, "grad_norm": 4.026401996612549, "learning_rate": 3.8060233744356634e-07}
+{"step": 23, "total_steps": 25, "epoch": 1, "examples_seen": 92, "answer_token_nll": 0.3449760282686515, "grad_norm": 4.592548847198486, "learning_rate": 1.7037086855465902e-07}
+{"step": 24, "total_steps": 25, "epoch": 1, "examples_seen": 96, "answer_token_nll": 0.21478440816359673, "grad_norm": 4.838008403778076, "learning_rate": 4.2775693130948094e-08}
+{"step": 25, "total_steps": 25, "epoch": 1, "examples_seen": 100, "answer_token_nll": 0.3107534536254516, "grad_norm": 6.111442565917969, "learning_rate": 0.0, "val_answer_token_nll": 0.2952991901203442}

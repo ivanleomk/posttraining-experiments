@@ -19,7 +19,14 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, DirectoryPath, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    DirectoryPath,
+    Field,
+    FilePath,
+    ValidationError,
+)
 
 MODEL_ID = "EleutherAI/gpt-j-6b"
 MODEL_REVISION = "47e169305d2e8376be1d31e765533382721b2cc1"
@@ -30,6 +37,7 @@ class EvalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     output: Path
     adapter: DirectoryPath | None = None
+    benchmark: FilePath | None = None
     samples: int = Field(default=20, ge=10)
     batch_size: int = Field(default=10, ge=1)
     max_new_tokens: int = Field(default=512, ge=1)
@@ -41,6 +49,7 @@ def parse_args(argv: list[str] | None = None) -> EvalConfig:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--adapter", type=Path)
+    p.add_argument("--benchmark", type=Path)
     p.add_argument("--samples", type=int, default=20)
     p.add_argument("--batch-size", type=int, default=10)
     p.add_argument("--max-new-tokens", type=int, default=512)
@@ -52,11 +61,21 @@ def parse_args(argv: list[str] | None = None) -> EvalConfig:
         p.error(str(error))
 
 
-def prepare_benchmark(output: Path) -> tuple[dict[str, Any], Path, dict[str, float]]:
+def prepare_benchmark(
+    output: Path, benchmark: Path | None = None
+) -> tuple[dict[str, Any], Path, dict[str, float]]:
     from human_eval.data import read_problems
     from human_eval.evaluation import evaluate_functional_correctness
 
-    problems = read_problems()
+    if benchmark is None:
+        problems = read_problems()
+    else:
+        rows = [
+            json.loads(line)
+            for line in benchmark.read_text().splitlines()
+            if line.strip()
+        ]
+        problems = {row["task_id"]: row for row in rows}
     problem_file = output / "problems.jsonl"
     problem_file.write_text(
         "".join(json.dumps(dict(v, task_id=k)) + "\n" for k, v in problems.items())
@@ -83,6 +102,24 @@ def load_evaluation_model(config: EvalConfig) -> tuple[Any, Any, dict[str, str]]
     adapter_hashes = {}
     tok = AutoTokenizer.from_pretrained(MODEL_ID, revision=MODEL_REVISION)
     tok.pad_token = tok.eos_token
+    dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    if config.adapter and (config.adapter / "config.json").exists():
+        adapter_hashes = {
+            f.name: hashlib.sha256(f.read_bytes()).hexdigest()
+            for f in config.adapter.iterdir()
+            if f.is_file()
+        }
+        model = (
+            AutoModelForCausalLM.from_pretrained(
+                config.adapter,
+                torch_dtype=dtype,
+                trust_remote_code=False,
+            )
+            .to("cuda")
+            .eval()
+        )
+        return model, tok, adapter_hashes
+
     model = (
         AutoModelForCausalLM.from_pretrained(
             MODEL_ID,
@@ -205,18 +242,19 @@ def score_samples(sample_path: Path, problem_file: Path) -> dict[str, float]:
     )
 
 
-def evaluate_model(config: EvalConfig) -> dict[str, Any]:
-    """Validate the harness, generate completions, then score with HumanEval."""
+def run_benchmark_eval(
+    model: Any,
+    tokenizer: Any,
+    config: EvalConfig,
+    adapter_hashes: dict[str, str] | None = None,
+) -> dict[str, Any]:
     import torch
     import transformers
 
-    if config.output.exists():
-        raise FileExistsError(f"{config.output} already exists")
-    if not torch.cuda.is_available():
-        raise RuntimeError("A CUDA GPU is required")
-    config.output.mkdir(parents=True)
-    problems, problem_file, control = prepare_benchmark(config.output)
-    model, tokenizer, adapter_hashes = load_evaluation_model(config)
+    config.output.mkdir(parents=True, exist_ok=True)
+    problems, problem_file, control = prepare_benchmark(
+        config.output, config.benchmark
+    )
     metadata = dict(
         config.model_dump(mode="json"),
         model=MODEL_ID,
@@ -228,7 +266,7 @@ def evaluate_model(config: EvalConfig) -> dict[str, Any]:
         torch=torch.__version__,
         transformers=transformers.__version__,
         gpu=torch.cuda.get_device_name(0),
-        adapter_files_sha256=adapter_hashes,
+        adapter_files_sha256=adapter_hashes or {},
         dataset_sha256=hashlib.sha256(
             json.dumps(problems, sort_keys=True).encode()
         ).hexdigest(),
@@ -247,6 +285,18 @@ def evaluate_model(config: EvalConfig) -> dict[str, Any]:
     )
     (config.output / "summary.json").write_text(json.dumps(summary, indent=2))
     return summary
+
+
+def evaluate_model(config: EvalConfig) -> dict[str, Any]:
+    """Validate the harness, generate completions, then score with HumanEval."""
+    import torch
+
+    if config.output.exists():
+        raise FileExistsError(f"{config.output} already exists")
+    if not torch.cuda.is_available():
+        raise RuntimeError("A CUDA GPU is required")
+    model, tokenizer, adapter_hashes = load_evaluation_model(config)
+    return run_benchmark_eval(model, tokenizer, config, adapter_hashes)
 
 
 def main() -> None:
