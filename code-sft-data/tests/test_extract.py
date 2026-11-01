@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from textwrap import dedent
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from generate_splits import extract
@@ -12,11 +13,22 @@ from generate_splits import extract
 
 class ExtractTests(unittest.TestCase):
     def row(self, code: str, instruction: str = "Return the input.") -> dict[str, str]:
-        return {"instruction": instruction, "response": f"```python\n{code}\n```"}
+        return {
+            "instruction": instruction,
+            "response": f"""```python
+{code}
+```""",
+        }
 
     def test_builds_prompt_and_answer_from_source_fields(self):
         row = self.row(
-            'def identity(value):\n    """Old teacher docstring."""\n    return value'
+            dedent(
+                '''
+                def identity(value):
+                    """Old teacher docstring."""
+                    return value
+                '''
+            ).strip()
         )
         row.update(
             seed="SEED_MUST_NOT_APPEAR", prompt="GENERATOR_PROMPT_MUST_NOT_APPEAR"
@@ -40,13 +52,30 @@ class ExtractTests(unittest.TestCase):
             with self.subTest(language=language):
                 row = {
                     "instruction": "Return one.",
-                    "response": f"```{language}\ndef f():\n    return 1\n```",
+                    "response": dedent(f"""
+                        ```{language}
+                        def f():
+                            return 1
+                        ```
+                    """).strip(),
                 }
                 self.assertEqual(extract(row)[1], "    return 1\n")
 
     def test_preserves_signature_instruction_and_control_flow(self):
-        instruction = 'Return "yes" for positive values.\nOtherwise return None. Use \\ carefully.'
-        code = 'def check(value: int, /, *, minimum=0) -> str | None:\n    if value > minimum:\n        return "yes"\n    return None'
+        instruction = dedent(
+            """
+            Return "yes" for positive values.
+            Otherwise return None. Use \\ carefully.
+            """
+        ).strip()
+        code = dedent(
+            """
+            def check(value: int, /, *, minimum=0) -> str | None:
+                if value > minimum:
+                    return "yes"
+                return None
+            """
+        ).strip()
         prompt, completion, _ = extract(self.row(code, instruction))
         function = ast.parse(prompt + completion).body[0]
 
@@ -61,23 +90,82 @@ class ExtractTests(unittest.TestCase):
         )
 
     def test_body_fingerprint_ignores_formatting_and_docstrings(self):
-        first = self.row('def f(x):\n    """First docstring."""\n    return x+1')
-        second = self.row(
-            "def f(x):\n    # a comment\n    return x + 1", "Different instruction."
+        first = self.row(
+            dedent(
+                '''
+            def f(x):
+                """First docstring."""
+                return x+1
+            '''
+            ).strip()
         )
-        changed = self.row("def f(x):\n    return x - 1")
+        second = self.row(
+            dedent(
+                """
+                def f(x):
+                    # a comment
+                    return x + 1
+                """
+            ).strip(),
+            "Different instruction.",
+        )
+        changed = self.row(
+            dedent(
+                """
+            def f(x):
+                return x - 1
+            """
+            ).strip()
+        )
         self.assertEqual(extract(first)[2], extract(second)[2])
         self.assertNotEqual(extract(first)[2], extract(changed)[2])
 
     def test_rejects_missing_multiple_and_invalid_code_blocks(self):
         cases = [
-            ("def f():\n    return 1", "not_one_code_block"),
-            ("```javascript\nfunction f() {}\n```", "not_one_code_block"),
             (
-                "```python\ndef f():\n    return 1\n```\n```py\ndef g():\n    return 2\n```",
+                dedent(
+                    """
+                def f():
+                    return 1
+                """
+                ).strip(),
                 "not_one_code_block",
             ),
-            ("```python\ndef broken(:\n```", "syntax_error"),
+            (
+                dedent(
+                    """
+                ```javascript
+                function f() {}
+                ```
+                """
+                ).strip(),
+                "not_one_code_block",
+            ),
+            (
+                dedent(
+                    """
+                    ```python
+                    def f():
+                        return 1
+                    ```
+                    ```py
+                    def g():
+                        return 2
+                    ```
+                    """
+                ).strip(),
+                "not_one_code_block",
+            ),
+            (
+                dedent(
+                    """
+                ```python
+                def broken(:
+                ```
+                """
+                ).strip(),
+                "syntax_error",
+            ),
         ]
         for response, reason in cases:
             with self.subTest(reason=reason, response=response):
@@ -87,30 +175,105 @@ class ExtractTests(unittest.TestCase):
     def test_rejects_unsupported_structure_and_dependencies(self):
         cases = [
             (
-                "def f():\n    return 1\n\ndef g():\n    return 2",
+                dedent(
+                    """
+                    def f():
+                        return 1
+
+                    def g():
+                        return 2
+                    """
+                ).strip(),
                 "not_one_standalone_function",
             ),
-            ("import math\ndef f():\n    return 1", "not_one_standalone_function"),
-            ("class Example:\n    pass", "not_one_standalone_function"),
-            ("async def f():\n    return 1", "not_one_standalone_function"),
-            ("@decorator\ndef f():\n    return 1", "decorated_function"),
             (
-                "def f():\n    import math\n    return math.pi",
+                dedent(
+                    """
+                import math
+                def f():
+                    return 1
+                """
+                ).strip(),
+                "not_one_standalone_function",
+            ),
+            (
+                dedent(
+                    """
+                class Example:
+                    pass
+                """
+                ).strip(),
+                "not_one_standalone_function",
+            ),
+            (
+                dedent(
+                    """
+                async def f():
+                    return 1
+                """
+                ).strip(),
+                "not_one_standalone_function",
+            ),
+            (
+                dedent(
+                    """
+                @decorator
+                def f():
+                    return 1
+                """
+                ).strip(),
+                "decorated_function",
+            ),
+            (
+                dedent(
+                    """
+                    def f():
+                        import math
+                        return math.pi
+                    """
+                ).strip(),
                 "complex_or_external_dependencies",
             ),
             (
-                "def f():\n    from math import pi\n    return pi",
+                dedent(
+                    """
+                    def f():
+                        from math import pi
+                        return pi
+                    """
+                ).strip(),
                 "complex_or_external_dependencies",
             ),
             (
-                "def f():\n    global x\n    return x",
+                dedent(
+                    """
+                    def f():
+                        global x
+                        return x
+                    """
+                ).strip(),
                 "complex_or_external_dependencies",
             ),
             (
-                "def f():\n    class Nested:\n        pass\n    return Nested",
+                dedent(
+                    """
+                    def f():
+                        class Nested:
+                            pass
+                        return Nested
+                    """
+                ).strip(),
                 "complex_or_external_dependencies",
             ),
-            ('def f():\n    """Only a docstring."""', "empty_function"),
+            (
+                dedent(
+                    '''
+                def f():
+                    """Only a docstring."""
+                '''
+                ).strip(),
+                "empty_function",
+            ),
         ]
         for code, reason in cases:
             with self.subTest(code=code):
@@ -130,12 +293,23 @@ class ExtractTests(unittest.TestCase):
         ):
             with self.subTest(call=name):
                 with self.assertRaisesRegex(ValueError, "^io_or_dynamic_execution$"):
-                    extract(self.row(f"def f():\n    return {name}()"))
+                    extract(
+                        self.row(
+                            dedent(f"""
+                        def f():
+                            return {name}()
+                    """).strip()
+                        )
+                    )
 
     def test_never_executes_defaults_or_function_body(self):
         with tempfile.TemporaryDirectory() as directory:
             marker = Path(directory) / "must-not-exist"
-            code = f"def f(value=1 / 0):\n    marker = {str(marker)!r}\n    raise RuntimeError(marker)"
+            code = dedent(f"""
+                def f(value=1 / 0):
+                    marker = {str(marker)!r}
+                    raise RuntimeError(marker)
+            """).strip()
             prompt, completion, _ = extract(self.row(code))
             self.assertIn("1 / 0", prompt)
             self.assertIn("raise RuntimeError", completion)
