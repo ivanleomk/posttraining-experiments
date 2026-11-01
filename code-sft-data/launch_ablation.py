@@ -27,6 +27,14 @@ class ArmSpec(BaseModel):
     name: str
     train_size: int
     train_file: FilePath | None = None
+    warmup_file: FilePath | None = None
+    warmup_epochs: int = 0
+    warmup_lr: float = 1e-4
+    cpt_epochs: int = 0
+    cpt_lr: float = 5e-6
+    zero_init_dynamics: bool = False
+    lambda_mse: float | None = None
+    lambda_kl: float | None = None
     epochs: int
     val_every: int
     learning_rate: float = 1e-5
@@ -85,6 +93,8 @@ def parse_args(argv: list[str] | None = None) -> AblationConfig:
 
 
 def build_arms(config: AblationConfig) -> list[ArmSpec]:
+    warmup_default = config.splits_dir / "repo-warmup-1000.jsonl"
+    warmup_file = warmup_default if warmup_default.exists() else None
     specs = {
         "base": ArmSpec(
             name="base",
@@ -138,6 +148,64 @@ def build_arms(config: AblationConfig) -> list[ArmSpec]:
             name="nextlat-sft-10000",
             train_size=10000,
             train_file=config.splits_dir / "train-10000.jsonl",
+            epochs=1,
+            val_every=100,
+            learning_rate=config.learning_rate,
+        ),
+        "nextlat-warmup-sft-100": ArmSpec(
+            name="nextlat-warmup-sft-100",
+            train_size=100,
+            train_file=config.splits_dir / "train-100.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=5,
+            learning_rate=config.learning_rate,
+        ),
+        "nextlat-warmup-sft-1000": ArmSpec(
+            name="nextlat-warmup-sft-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "nextlat-cpt-sft-1000": ArmSpec(
+            name="nextlat-cpt-sft-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            cpt_epochs=1,
+            cpt_lr=5e-6,
+            zero_init_dynamics=True,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "nextlat-warmup-sft-10000": ArmSpec(
+            name="nextlat-warmup-sft-10000",
+            train_size=10000,
+            train_file=config.splits_dir / "train-10000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
             epochs=1,
             val_every=100,
             learning_rate=config.learning_rate,
@@ -211,6 +279,19 @@ def paired_bootstrap_ci(
     return out
 
 
+def write_file_with_retry(
+    sb: Any, remote_path: str, data: bytes, retries: int = 3
+) -> None:
+    for attempt in range(retries):
+        try:
+            sb.write_file(remote_path, data).result()
+            return
+        except Exception:
+            if attempt + 1 == retries:
+                raise
+            time.sleep(2 * (attempt + 1))
+
+
 def download_if_exists(sb: Any, remote_path: str, local_path: Path) -> bool:
     try:
         data = sb.read_file(remote_path, timeout_seconds=30).result()
@@ -237,6 +318,8 @@ def run_arm_in_sandbox(
         "memory": "32Gi",
         "gpu": 1,
     }
+    eff_lambda_mse = arm.lambda_mse if arm.lambda_mse is not None else config.lambda_mse
+    eff_lambda_kl = arm.lambda_kl if arm.lambda_kl is not None else config.lambda_kl
     wb_run = None
     try:
         with Sandbox.run(
@@ -247,27 +330,33 @@ def run_arm_in_sandbox(
             max_lifetime_seconds=config.max_lifetime_seconds,
         ) as sb:
             sb.exec(["bash", "-lc", "mkdir -p /tmp/work"]).result()
-            sb.write_file(
-                "/tmp/work/train_lora.py", (scripts_dir / "train_lora.py").read_bytes()
-            ).result()
-            sb.write_file(
-                "/tmp/work/nextlat.py", (scripts_dir / "nextlat.py").read_bytes()
-            ).result()
-            sb.write_file(
-                "/tmp/work/evaluate.py", (scripts_dir / "evaluate.py").read_bytes()
-            ).result()
-            sb.write_file(
+            write_file_with_retry(
+                sb, "/tmp/work/train_lora.py", (scripts_dir / "train_lora.py").read_bytes()
+            )
+            write_file_with_retry(
+                sb, "/tmp/work/nextlat.py", (scripts_dir / "nextlat.py").read_bytes()
+            )
+            write_file_with_retry(
+                sb, "/tmp/work/evaluate.py", (scripts_dir / "evaluate.py").read_bytes()
+            )
+            write_file_with_retry(
+                sb,
                 "/tmp/work/val-100.jsonl",
                 (config.splits_dir / "val-100.jsonl").read_bytes(),
-            ).result()
-            sb.write_file(
+            )
+            write_file_with_retry(
+                sb,
                 "/tmp/work/test-100.jsonl",
                 (config.splits_dir / "test-100.jsonl").read_bytes(),
-            ).result()
+            )
             if arm.train_file:
-                sb.write_file(
-                    "/tmp/work/train.jsonl", arm.train_file.read_bytes()
-                ).result()
+                write_file_with_retry(
+                    sb, "/tmp/work/train.jsonl", arm.train_file.read_bytes()
+                )
+            if arm.warmup_file:
+                write_file_with_retry(
+                    sb, "/tmp/work/warmup.jsonl", arm.warmup_file.read_bytes()
+                )
 
             extract_he = (
                 "python -c \"import io,urllib.request,zipfile; "
@@ -291,9 +380,14 @@ def run_arm_in_sandbox(
                     "arm": arm.name,
                     "mode": config.mode,
                     "objective": config.objective,
-                    "lambda_mse": config.lambda_mse,
-                    "lambda_kl": config.lambda_kl,
+                    "lambda_mse": eff_lambda_mse,
+                    "lambda_kl": eff_lambda_kl,
                     "proj_factor": config.proj_factor,
+                    "zero_init_dynamics": arm.zero_init_dynamics,
+                    "warmup_epochs": arm.warmup_epochs,
+                    "warmup_lr": arm.warmup_lr,
+                    "cpt_epochs": arm.cpt_epochs,
+                    "cpt_lr": arm.cpt_lr,
                     "train_size": arm.train_size,
                     "epochs": arm.epochs,
                     "learning_rate": arm.learning_rate,
@@ -309,9 +403,13 @@ def run_arm_in_sandbox(
                 "python -u /tmp/work/train_lora.py",
                 f"--mode {config.mode}",
                 f"--objective {config.objective}",
-                f"--lambda-mse {config.lambda_mse}",
-                f"--lambda-kl {config.lambda_kl}",
+                f"--lambda-mse {eff_lambda_mse}",
+                f"--lambda-kl {eff_lambda_kl}",
                 f"--proj-factor {config.proj_factor}",
+                f"--warmup-epochs {arm.warmup_epochs}",
+                f"--warmup-lr {arm.warmup_lr}",
+                f"--cpt-epochs {arm.cpt_epochs}",
+                f"--cpt-lr {arm.cpt_lr}",
                 "--val /tmp/work/val-100.jsonl",
                 "--output /tmp/work/out",
                 f"--epochs {arm.epochs}",
@@ -322,6 +420,10 @@ def run_arm_in_sandbox(
                 "--eval-benchmark /tmp/work/test-100.jsonl",
                 "--eval-benchmark humaneval",
             ]
+            if arm.zero_init_dynamics:
+                train_args.append("--zero-init-dynamics")
+            if arm.warmup_file:
+                train_args.insert(2, "--warmup-train /tmp/work/warmup.jsonl")
             if arm.train_file:
                 train_args.insert(2, "--train /tmp/work/train.jsonl")
 
@@ -482,15 +584,25 @@ def run_ablation(config: AblationConfig) -> dict[str, Any]:
                         paired_bootstrap_ci(b_res, a_res, seed=config.seed)
                     )
 
+    summary_path = config.output_dir / "ablation_summary.json"
+    existing_arms: dict[str, Any] = {}
+    existing_comp: dict[str, Any] = {}
+    if summary_path.exists():
+        try:
+            prev = json.loads(summary_path.read_text())
+            existing_arms = prev.get("arms", {})
+            existing_comp = prev.get("paired_bootstrap_vs_base", {})
+        except Exception:
+            pass
+    existing_arms.update(results)
+    existing_comp.update(comparisons)
     ablation_summary = {
         "group_id": group_id,
         "config": config.model_dump(mode="json"),
-        "arms": results,
-        "paired_bootstrap_vs_base": comparisons,
+        "arms": existing_arms,
+        "paired_bootstrap_vs_base": existing_comp,
     }
-    (config.output_dir / "ablation_summary.json").write_text(
-        json.dumps(ablation_summary, indent=2)
-    )
+    summary_path.write_text(json.dumps(ablation_summary, indent=2))
     return ablation_summary
 
 

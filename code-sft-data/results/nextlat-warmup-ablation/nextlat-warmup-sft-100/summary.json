@@ -1,0 +1,65 @@
+{
+  "status": "complete",
+  "steps": 275,
+  "config": {
+    "train": "/tmp/work/train.jsonl",
+    "warmup_train": "/tmp/work/warmup.jsonl",
+    "val": "/tmp/work/val-100.jsonl",
+    "output": "/tmp/work/out",
+    "mode": "full",
+    "objective": "nextlat",
+    "lambda_mse": 0.2,
+    "lambda_kl": 0.1,
+    "proj_factor": 0.5,
+    "zero_init_dynamics": true,
+    "warmup_epochs": 1,
+    "warmup_lr": 0.0001,
+    "cpt_epochs": 0,
+    "cpt_lr": 5e-06,
+    "epochs": 1,
+    "learning_rate": 1e-05,
+    "accumulation": 4,
+    "val_every": 5,
+    "eval_benchmarks": [
+      "/tmp/work/test-100.jsonl",
+      "humaneval"
+    ],
+    "save_checkpoint": false,
+    "hf_repo": null,
+    "seed": 42,
+    "model": "EleutherAI/gpt-j-6b",
+    "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+    "train_sha256": "75dac0b06470a10414f2f7f2a076e5414d8d9e8f97b02cf9d4f5518d4c638724",
+    "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+    "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+    "examples": 100,
+    "warmup_examples": 1000,
+    "val_examples": 100,
+    "dtype": "torch.float32"
+  },
+  "final_metrics": {
+    "phase": "sft",
+    "step": 275,
+    "total_steps": 275,
+    "epoch": 1,
+    "examples_seen": 100,
+    "answer_token_nll": 0.3096690400751359,
+    "grad_norm": 5.71177339553833,
+    "learning_rate": 0.0,
+    "nextlat_mse_loss": 0.3151593021023164,
+    "nextlat_kl_loss": 1.170687055369036,
+    "total_loss": 0.48976960901273503,
+    "val_answer_token_nll": 0.29630744510792456
+  },
+  "evaluations": {
+    "test_100": {
+      "pass@1": 0.1285,
+      "pass@10": 0.22473608434908743
+    },
+    "humaneval": {
+      "pass@1": 0.0701219512195122,
+      "pass@10": 0.10335866844022096
+    }
+  },
+  "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/0v6p3bn8"
+}

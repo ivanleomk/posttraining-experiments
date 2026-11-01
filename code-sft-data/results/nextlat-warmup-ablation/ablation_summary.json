@@ -1,0 +1,607 @@
+{
+  "objective": "nextlat-repo-warmup",
+  "arms": {
+    "nextlat-warmup-sft-100": {
+      "status": "complete",
+      "steps": 275,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 5,
+        "eval_benchmarks": [
+          "/tmp/work/test-100.jsonl",
+          "humaneval"
+        ],
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "75dac0b06470a10414f2f7f2a076e5414d8d9e8f97b02cf9d4f5518d4c638724",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 100,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 275,
+        "total_steps": 275,
+        "epoch": 1,
+        "examples_seen": 100,
+        "answer_token_nll": 0.3096690400751359,
+        "grad_norm": 5.71177339553833,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.3151593021023164,
+        "nextlat_kl_loss": 1.170687055369036,
+        "total_loss": 0.48976960901273503,
+        "val_answer_token_nll": 0.29630744510792456
+      },
+      "evaluations": {
+        "test_100": {
+          "pass@1": 0.1285,
+          "pass@10": 0.22473608434908743
+        },
+        "humaneval": {
+          "pass@1": 0.0701219512195122,
+          "pass@10": 0.10335866844022096
+        }
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/0v6p3bn8"
+    },
+    "nextlat-warmup-sft-1000": {
+      "status": "complete",
+      "steps": 500,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [
+          "/tmp/work/test-100.jsonl",
+          "humaneval"
+        ],
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 500,
+        "total_steps": 500,
+        "epoch": 1,
+        "examples_seen": 1000,
+        "answer_token_nll": 0.35274046268556025,
+        "grad_norm": 4.680863380432129,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.18414308355226144,
+        "nextlat_kl_loss": 0.5633046841466581,
+        "total_loss": 0.44589954428858575,
+        "val_answer_token_nll": 0.26900571898093556
+      },
+      "evaluations": {
+        "test_100": {
+          "pass@1": 0.23,
+          "pass@10": 0.4112686462144666
+        },
+        "humaneval": {
+          "pass@1": 0.09176829268292683,
+          "pass@10": 0.13830202022548924
+        }
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/6ea757il"
+    },
+    "nextlat-cpt-sft-1000": {
+      "status": "complete",
+      "steps": 750,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 1,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [
+          "/tmp/work/test-100.jsonl",
+          "humaneval"
+        ],
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 750,
+        "total_steps": 750,
+        "epoch": 1,
+        "examples_seen": 1000,
+        "answer_token_nll": 0.34365235381312187,
+        "grad_norm": 4.785099029541016,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.17292323329231957,
+        "nextlat_kl_loss": 0.5272808778595615,
+        "total_loss": 0.43096508128302435,
+        "val_answer_token_nll": 0.26541230701189134
+      },
+      "evaluations": {
+        "test_100": {
+          "pass@1": 0.22649999999999998,
+          "pass@10": 0.38174971313516204
+        },
+        "humaneval": {
+          "pass@1": 0.09847560975609755,
+          "pass@10": 0.14046561872771945
+        }
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/60vltons"
+    },
+    "nextlat-warmup-sft-10000": {
+      "status": "complete",
+      "steps": 2750,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 100,
+        "eval_benchmarks": [
+          "/tmp/work/test-100.jsonl",
+          "humaneval"
+        ],
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "7af46dc5cd9a2eb47a28c498337100da3bc1ed3f8538bee9077bde6827e03ac8",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 10000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 2750,
+        "total_steps": 2750,
+        "epoch": 1,
+        "examples_seen": 10000,
+        "answer_token_nll": 0.24784551577559155,
+        "grad_norm": 3.0050833225250244,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.11065665118173876,
+        "nextlat_kl_loss": 0.3632877972811016,
+        "total_loss": 0.3063056318839984,
+        "val_answer_token_nll": 0.20802053438215617
+      },
+      "evaluations": {
+        "test_100": {
+          "pass@1": 0.4084999999999999,
+          "pass@10": 0.48773095325726906
+        },
+        "humaneval": {
+          "pass@1": 0.13170731707317074,
+          "pass@10": 0.17396854070946047
+        }
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/qj81ntc6"
+    }
+  },
+  "paired_bootstrap_vs_base": {
+    "nextlat-warmup-sft-100": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": -0.04900000000000002,
+          "ci95_low": -0.10599999999999998,
+          "ci95_high": 0.003999999999999998
+        },
+        "pass@10": {
+          "delta": -0.12221481305072636,
+          "ci95_low": -0.20770719218861636,
+          "ci95_high": -0.03637224230877481
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": -0.03871951219512195,
+          "ci95_low": -0.07195121951219513,
+          "ci95_high": -0.007317073170731709
+        },
+        "pass@10": {
+          "delta": -0.04746118017752088,
+          "ci95_low": -0.09043456920637319,
+          "ci95_high": -0.0063549208474829545
+        }
+      }
+    },
+    "nextlat-warmup-sft-1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.052499999999999956,
+          "ci95_low": -0.014000000000000004,
+          "ci95_high": 0.12099999999999994
+        },
+        "pass@10": {
+          "delta": 0.06431774881465285,
+          "ci95_low": -0.02267498755114854,
+          "ci95_high": 0.15064609539067741
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": -0.017073170731707315,
+          "ci95_low": -0.04878048780487806,
+          "ci95_high": 0.013719512195121946
+        },
+        "pass@10": {
+          "delta": -0.012517828392252616,
+          "ci95_low": -0.04936015807797126,
+          "ci95_high": 0.02494753792609264
+        }
+      }
+    },
+    "nextlat-cpt-sft-1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.04899999999999999,
+          "ci95_low": -0.018999999999999975,
+          "ci95_high": 0.11649999999999999
+        },
+        "pass@10": {
+          "delta": 0.034798815735348244,
+          "ci95_low": -0.05460888956244995,
+          "ci95_high": 0.12517801857585137
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": -0.010365853658536591,
+          "ci95_low": -0.043292682926829265,
+          "ci95_high": 0.02164634146341463
+        },
+        "pass@10": {
+          "delta": -0.010354229890022385,
+          "ci95_low": -0.04932296333885853,
+          "ci95_high": 0.028595163614607847
+        }
+      }
+    },
+    "nextlat-warmup-sft-10000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.23099999999999998,
+          "ci95_low": 0.15849999999999992,
+          "ci95_high": 0.3035
+        },
+        "pass@10": {
+          "delta": 0.14078005585745523,
+          "ci95_low": 0.04885340665526426,
+          "ci95_high": 0.23050315010067338
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": 0.022865853658536592,
+          "ci95_low": -0.015548780487804885,
+          "ci95_high": 0.06371951219512195
+        },
+        "pass@10": {
+          "delta": 0.023148692091718586,
+          "ci95_low": -0.024630772082255885,
+          "ci95_high": 0.07135264493869041
+        }
+      }
+    }
+  },
+  "paired_bootstrap_vs_matched_ntp": {
+    "nextlat-warmup-sft-100": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": -2.220446049250313e-18,
+          "ci95_low": -0.033499999999999995,
+          "ci95_high": 0.0325
+        },
+        "pass@10": {
+          "delta": 0.016385340665526424,
+          "ci95_low": -0.03483735304942737,
+          "ci95_high": 0.07084343674900952
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": 0.017378048780487806,
+          "ci95_low": 0.0009146341463414642,
+          "ci95_high": 0.03780487804878049
+        },
+        "pass@10": {
+          "delta": 0.020918525897571434,
+          "ci95_low": -0.00032346551734152774,
+          "ci95_high": 0.046161905564042545
+        }
+      }
+    },
+    "nextlat-warmup-sft-1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": -0.0225,
+          "ci95_low": -0.07050000000000002,
+          "ci95_high": 0.023499999999999997
+        },
+        "pass@10": {
+          "delta": -0.008808157786485962,
+          "ci95_low": -0.07739402238628243,
+          "ci95_high": 0.05960813180627422
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": -0.017073170731707315,
+          "ci95_low": -0.03445121951219512,
+          "ci95_high": -0.001219512195121951
+        },
+        "pass@10": {
+          "delta": -0.010624956105587382,
+          "ci95_low": -0.04018589580773377,
+          "ci95_high": 0.018061428679302275
+        }
+      }
+    },
+    "nextlat-cpt-sft-1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": -0.025999999999999992,
+          "ci95_low": -0.08299999999999998,
+          "ci95_high": 0.02850000000000001
+        },
+        "pass@10": {
+          "delta": -0.038327090865790565,
+          "ci95_low": -0.1193339323215484,
+          "ci95_high": 0.042884453008292016
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": -0.010365853658536586,
+          "ci95_low": -0.02591463414634147,
+          "ci95_high": 0.004573170731707313
+        },
+        "pass@10": {
+          "delta": -0.008461357603357152,
+          "ci95_low": -0.033781271963707976,
+          "ci95_high": 0.01697624658811701
+        }
+      }
+    },
+    "nextlat-warmup-sft-10000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.0225,
+          "ci95_low": -0.027000000000000007,
+          "ci95_high": 0.073
+        },
+        "pass@10": {
+          "delta": -0.031076392647600082,
+          "ci95_low": -0.10534050315010067,
+          "ci95_high": 0.04220534109852995
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": -0.004573170731707317,
+          "ci95_low": -0.024390243902439022,
+          "ci95_high": 0.015548780487804876
+        },
+        "pass@10": {
+          "delta": -0.007580136015913406,
+          "ci95_low": -0.035987279729256624,
+          "ci95_high": 0.019580406379092478
+        }
+      }
+    }
+  },
+  "paired_bootstrap_vs_cold_nextlat": {
+    "nextlat-warmup-sft-100": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.049,
+          "ci95_low": -0.0055000000000000005,
+          "ci95_high": 0.10549999999999998
+        },
+        "pass@10": {
+          "delta": 0.07780948927233754,
+          "ci95_low": -0.006903537638831756,
+          "ci95_high": 0.1644252960661629
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": 0.057012195121951215,
+          "ci95_low": 0.028353658536585374,
+          "ci95_high": 0.0902439024390244
+        },
+        "pass@10": {
+          "delta": 0.07457931330920835,
+          "ci95_low": 0.037868699864659995,
+          "ci95_high": 0.11555088609947779
+        }
+      }
+    },
+    "nextlat-warmup-sft-1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.10650000000000003,
+          "ci95_low": 0.051499999999999976,
+          "ci95_high": 0.16300000000000003
+        },
+        "pass@10": {
+          "delta": 0.12013044231310484,
+          "ci95_low": 0.04045735997748382,
+          "ci95_high": 0.2009026499815974
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": 0.009451219512195125,
+          "ci95_low": -0.011890243902439018,
+          "ci95_high": 0.03231707317073171
+        },
+        "pass@10": {
+          "delta": 0.033039258370565476,
+          "ci95_low": -0.0031805297322929273,
+          "ci95_high": 0.07138752944556011
+        }
+      }
+    },
+    "nextlat-cpt-sft-1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.10299999999999997,
+          "ci95_low": 0.04500000000000001,
+          "ci95_high": 0.16400000000000003
+        },
+        "pass@10": {
+          "delta": 0.09061150923380022,
+          "ci95_low": 0.006110329299183791,
+          "ci95_high": 0.17521249648184636
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": 0.016158536585365854,
+          "ci95_low": -0.0060975609756097554,
+          "ci95_high": 0.04176829268292683
+        },
+        "pass@10": {
+          "delta": 0.0352028568727957,
+          "ci95_low": 0.004073962547306956,
+          "ci95_high": 0.07056558181680889
+        }
+      }
+    },
+    "nextlat-warmup-sft-10000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.11149999999999997,
+          "ci95_low": 0.053999999999999986,
+          "ci95_high": 0.17499999999999996
+        },
+        "pass@10": {
+          "delta": 0.10006067461949815,
+          "ci95_low": 0.034495659139621986,
+          "ci95_high": 0.1705875857888242
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": 0.014939024390243898,
+          "ci95_low": -0.009146341463414632,
+          "ci95_high": 0.039634146341463415
+        },
+        "pass@10": {
+          "delta": -0.0008694724063220633,
+          "ci95_low": -0.03284863120719799,
+          "ci95_high": 0.030402491301645573
+        }
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ from pathlib import Path
 from textwrap import dedent
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_repo_warmup import extract_repo_function
 from generate_splits import choose, extract
 from generate_tests import build_mutants, extract_check_function
 from launch_ablation import paired_bootstrap_ci, pass_at_k
@@ -431,6 +432,64 @@ class ExtractTests(unittest.TestCase):
         mask = build_nextlat_mask(ids, labels, eos_token_id=0)
         self.assertEqual(mask, [False, True, True, True])
         self.assertEqual(build_nextlat_mask([1, 0], [-100, 0], eos_token_id=0), [])
+
+    def test_repo_warmup_extract_and_warmup_args(self):
+        fn_node = ast.parse(
+            dedent(
+                '''
+                def clamp_value(x: int, low: int, high: int) -> int:
+                    """Clamp x into the inclusive range [low, high]."""
+                    if x < low:
+                        return low
+                    if x > high:
+                        return high
+                    return x
+                '''
+            ).strip()
+        ).body[0]
+        assert isinstance(fn_node, ast.FunctionDef)
+        extracted = extract_repo_function(fn_node)
+        self.assertIsNotNone(extracted)
+        prompt, completion, doc, body_sha = extracted
+        self.assertIn("def clamp_value", prompt)
+        self.assertIn("return low", completion)
+        self.assertEqual(doc, "Clamp x into the inclusive range [low, high].")
+        self.assertRegex(body_sha, r"^[0-9a-f]{64}$")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            train_file = root / "train.jsonl"
+            warmup_file = root / "warmup.jsonl"
+            train_file.write_text('{"split": "train"}\n')
+            warmup_file.write_text('{"split": "train"}\n')
+            cfg = parse_train_args(
+                [
+                    "--mode",
+                    "full",
+                    "--objective",
+                    "nextlat",
+                    "--train",
+                    str(train_file),
+                    "--warmup-train",
+                    str(warmup_file),
+                    "--warmup-epochs",
+                    "1",
+                    "--cpt-epochs",
+                    "1",
+                    "--zero-init-dynamics",
+                    "--lambda-mse",
+                    "0.2",
+                    "--lambda-kl",
+                    "0.1",
+                    "--output",
+                    str(root / "out"),
+                ]
+            )
+            self.assertTrue(cfg.zero_init_dynamics)
+            self.assertEqual(cfg.warmup_epochs, 1)
+            self.assertEqual(cfg.cpt_epochs, 1)
+            self.assertAlmostEqual(cfg.lambda_mse, 0.2)
+            self.assertAlmostEqual(cfg.lambda_kl, 0.1)
 
 
 if __name__ == "__main__":

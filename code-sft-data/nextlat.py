@@ -164,3 +164,61 @@ def compute_nextlat_losses(
         "kl_loss": kl_loss,
         "latent_pairs": valid_mask.sum(),
     }
+
+
+def compute_dynamics_warmup_losses(
+    model: Any,
+    dynamics_model: Any,
+    input_ids: Any,
+    labels: Any,
+    eos_token_id: int,
+) -> dict[str, Any]:
+    """Compute NextLat Smooth-L1 and KL losses with the backbone frozen under no_grad."""
+    import torch
+    import torch.nn.functional as F
+
+    if input_ids.size(1) < 3:
+        zero = torch.zeros((), device=input_ids.device, dtype=torch.float32)
+        return {
+            "mse_loss": zero,
+            "kl_loss": zero,
+            "latent_pairs": torch.tensor(0, device=input_ids.device),
+        }
+
+    with torch.no_grad():
+        outputs = model(
+            input_ids=input_ids,
+            output_hidden_states=True,
+        )
+        hidden_states = outputs.hidden_states[-1].detach()
+        token_embeds = get_token_embeddings(model, input_ids).detach()
+        teacher_logits = outputs.logits[:, 1:-1, :].detach()
+        lm_head = get_lm_head(model)
+        head_weight = lm_head.weight.detach()
+        head_bias = lm_head.bias.detach() if lm_head.bias is not None else None
+
+    curr_h = hidden_states[:, :-2, :]
+    target_h = hidden_states[:, 1:-1, :]
+    next_emb = token_embeds[:, 1:-1, :]
+
+    valid_mask = (
+        (labels[:, 1:-1] != -100)
+        & (labels[:, 2:] != -100)
+        & (input_ids[:, 1:-1] != eos_token_id)
+    )
+
+    pred_h = dynamics_model(curr_h, next_emb)
+
+    mse_elem = F.smooth_l1_loss(pred_h.float(), target_h.float(), reduction="none")
+    w = valid_mask.unsqueeze(-1).to(dtype=mse_elem.dtype)
+    denom = (w.sum() * mse_elem.size(-1)).clamp_min(1.0)
+    mse_loss = (mse_elem * w).sum() / denom
+
+    student_logits = F.linear(pred_h, head_weight, head_bias)
+    kl_loss = categorical_kl_loss(teacher_logits, student_logits, valid_mask)
+
+    return {
+        "mse_loss": mse_loss,
+        "kl_loss": kl_loss,
+        "latent_pairs": valid_mask.sum(),
+    }
