@@ -25,3 +25,7 @@ To clone this repository on its own:
 ```bash
 git clone git@github.com:ivanleomk/posttraining-experiments.git
 ```
+
+## Experiments
+
+- [GPT-J code SFT: dataset size and training objective](code-sft-data/README.md) — dataset preparation, generated executable tests, NTP/NextLat-style LoRA ablations and evaluation plan.
