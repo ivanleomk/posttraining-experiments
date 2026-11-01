@@ -1,10 +1,38 @@
-"""Build pinned, nested code-SFT pools. Parses code but never executes it."""
+"""Generate nested 100/1k/10k train pools and a family-disjoint 100-row test set.
+Install: pip install pyarrow==26.0.0 transformers==4.56.2
+Run: python generate_splits.py --output /tmp/code-splits
+Downloads hash-checked inputs. Static checks do not certify solution correctness
+or semantic decontamination. Source: BigCode self-oss-instruct-sc2-exec-filter-50k,
+ODC-By; preserve source attribution and row provenance when redistributing.
+"""
+import urllib.request
 import argparse, ast, builtins, copy, gzip, hashlib, json, os, random, re, shutil, symtable, tempfile
 from collections import Counter
 from pathlib import Path
 import pyarrow.parquet as pq
 from transformers import AutoTokenizer
-from build_preview import extract, REV, MODEL_REV
+REV='356bb069eee815daa6e23e9a282eeefe1490ad44'
+MODEL_REV='47e169305d2e8376be1d31e765533382721b2cc1'
+def extract(row):
+    blocks=re.findall(r'```(?:python|py)?\s*\n(.*?)```',row['response'],re.S)
+    if len(blocks)!=1: raise ValueError('not_one_code_block')
+    try: tree=ast.parse(blocks[0])
+    except SyntaxError: raise ValueError('syntax_error')
+    if len(tree.body)!=1 or not isinstance(tree.body[0],ast.FunctionDef): raise ValueError('not_one_standalone_function')
+    fn=tree.body[0]
+    if fn.decorator_list: raise ValueError('decorated_function')
+    if any(isinstance(n,(ast.Import,ast.ImportFrom,ast.Global,ast.Nonlocal,ast.ClassDef,ast.AsyncFunctionDef)) for n in ast.walk(fn)): raise ValueError('complex_or_external_dependencies')
+    calls={n.func.id for n in ast.walk(fn) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name)}
+    if calls & {'open','exec','eval','compile','__import__','input','globals','locals'}: raise ValueError('io_or_dynamic_execution')
+    # Deterministic representation: same instruction, no teacher explanation, no seed code.
+    if ast.get_docstring(fn) is not None: fn.body=fn.body[1:]
+    if not fn.body: raise ValueError('empty_function')
+    body='\n'.join(ast.unparse(n) for n in fn.body)
+    signature=ast.unparse(fn).splitlines()[0]
+    prompt=signature+'\n    '+repr(row['instruction'])+'\n'
+    completion=''.join('    '+line+'\n' if line else '\n' for line in body.splitlines())
+    return prompt,completion,digest(ast.dump(ast.Module(body=fn.body,type_ignores=[]),include_attributes=False))
+
 ROOT=Path(__file__).resolve().parent
 SOURCE_SHA256='7bd6092e9940aedebe31f7049c460ba1549a920de5cb4b9bb36b0093cd51fc93'
 BLOCKED_IDS={533341}
@@ -93,9 +121,14 @@ def main():
     args=parser.parse_args()
     if args.output.exists(): raise FileExistsError(f'{args.output} exists; choose a new version directory')
     if args.train_size<1000 or args.test_size<1: raise ValueError('train-size >=1000 and test-size >=1 required')
+    if not args.source.exists():
+        args.source.parent.mkdir(parents=True,exist_ok=True)
+        urllib.request.urlretrieve(f'https://huggingface.co/datasets/bigcode/self-oss-instruct-sc2-exec-filter-50k/resolve/{REV}/data/train-00000-of-00001.parquet',args.source)
     source_hash=hashlib.sha256(args.source.read_bytes()).hexdigest()
     if source_hash!=SOURCE_SHA256: raise ValueError('Source hash differs from pinned BigCode parquet')
     benchmark_file=ROOT/'humaneval-reference.jsonl.gz'
+    if not benchmark_file.exists():
+        urllib.request.urlretrieve('https://raw.githubusercontent.com/openai/human-eval/b9453e8f1865df0a0057a1383767caa400acfbcf/data/HumanEval.jsonl.gz',benchmark_file)
     benchmark_hash=hashlib.sha256(benchmark_file.read_bytes()).hexdigest()
     if benchmark_hash!='b796127e635a67f93fb35c04f4cb03cf06f38c8072ee7cee8833d7bee06979ef': raise ValueError('Benchmark reference hash mismatch')
     benchmark=[json.loads(l) for l in gzip.decompress(benchmark_file.read_bytes()).decode().splitlines()]

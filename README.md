@@ -25,7 +25,3 @@ To clone this repository on its own:
 ```bash
 git clone git@github.com:ivanleomk/posttraining-experiments.git
 ```
-
-## Available experiments
-
-- [GPT-J code-SFT dataset-size ablation](code-sft-data/README.md): nested 100/1,000/10,000 training pools and a fixed 100-example holdout.
