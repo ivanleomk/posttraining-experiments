@@ -7,11 +7,9 @@ We will train on nested BigCode subsets, evaluate on 100 held-out BigCode proble
 ## What exists today
 
 - `generate_splits.py`: downloads pinned inputs and generates nested 100/1,000/10,000 training pools plus a separate 100-row holdout. It performs static filtering and structural overlap checks.
-- `train_lora.py`: answer-only NTP LoRA training on GPT-J.
-- `evaluate.py`: HumanEval generation and execution, optionally loading a LoRA adapter.
 - `tests/test_extract.py`: tests for the static code extractor.
 
-The existing `test-100` contains **reference solutions, not executable tests**. Gemini test generation, a separate validation split, custom-benchmark evaluation, and the NextLat-style objective still need implementation. This README is the plan, not a report of completed runs.
+The existing `test-100` contains **reference solutions, not executable tests**. Draft training and evaluation scripts are preserved on branch `codex/gptj-training-evaluation` for separate review. This merge includes only the split generator, extractor tests and experiment documentation. Gemini test generation, a separate validation split, custom-benchmark evaluation, and the NextLat-style objective still need implementation. This README is the plan, not a report of completed runs.
 
 ## 1. Freeze the data
 
@@ -73,7 +71,7 @@ Only `prompt` goes to the model. References and tests are used by the evaluator.
 
 ## 3. Establish the baseline
 
-Extend `evaluate.py` to accept the custom benchmark as well as HumanEval, using the same generation and scoring functions for base and adapter runs.
+Review and add the draft `evaluate.py`, extending it to accept the custom benchmark as well as HumanEval, using the same generation and scoring functions for base and adapter runs.
 
 - Run the original GPT-J checkpoint on both benchmarks before training.
 - Verify every canonical reference passes its benchmark tests.
@@ -94,7 +92,7 @@ Run generated code only in disposable sandboxes without credentials or host moun
 | 1,000 | Run | Run |
 | 10,000 | Run | Run |
 
-First establish the three NTP runs. Then implement and verify the auxiliary objective before running its three corresponding arms.
+Review and add the draft `train_lora.py`, then establish the three NTP runs. Then implement and verify the auxiliary objective before running its three corresponding arms.
 
 Shared starting recipe:
 
@@ -148,4 +146,4 @@ Keep results from the custom test set and HumanEval separate. Report small or un
 - [ ] Run and evaluate its three matched dataset-size arms.
 - [ ] Produce the comparison table and paired intervals; repeat relevant comparisons across seeds.
 
-Keep the three existing scripts as the entry points: parse arguments into a typed Pydantic configuration, then call the workflow function. Add focused helpers and tests for the new behavior as needed. No training or Gemini calls are initiated by this plan.
+Use three script entry points (`generate_splits.py`, `train_lora.py` and `evaluate.py`): parse arguments into a typed Pydantic configuration, then call the workflow function. Add focused helpers and tests for the new behavior as needed. No training or Gemini calls are initiated by this plan.
