@@ -21,31 +21,50 @@ class ExtractTests(unittest.TestCase):
         }
 
     def test_builds_prompt_and_answer_from_source_fields(self):
-        row = self.row(
-            dedent(
-                '''
-                def identity(value):
-                    """Old teacher docstring."""
-                    return value
-                '''
-            ).strip()
-        )
-        row.update(
-            seed="SEED_MUST_NOT_APPEAR", prompt="GENERATOR_PROMPT_MUST_NOT_APPEAR"
-        )
-        row["response"] = (
-            "Teacher explanation.\n" + row["response"] + "\nMore explanation."
-        )
+        cases = [
+            (
+                "code only",
+                dedent('''
+                    ```python
+                    def identity(value):
+                        """Old teacher docstring."""
+                        return value
+                    ```
+                ''').strip(),
+            ),
+            (
+                "code surrounded by explanations",
+                dedent('''
+                    Teacher explanation.
+                    ```python
+                    def identity(value):
+                        """Old teacher docstring."""
+                        return value
+                    ```
+                    More explanation.
+                ''').strip(),
+            ),
+        ]
+        for name, response in cases:
+            with self.subTest(case=name):
+                row = {
+                    "instruction": "Return the input.",
+                    "seed": "SEED_MUST_NOT_APPEAR",
+                    "prompt": "GENERATOR_PROMPT_MUST_NOT_APPEAR",
+                    "response": response,
+                }
 
-        prompt, completion, fingerprint = extract(row)
+                prompt, completion, fingerprint = extract(row)
 
-        self.assertEqual(prompt, "def identity(value):\n    'Return the input.'\n")
-        self.assertEqual(completion, "    return value\n")
-        self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
-        self.assertEqual(
-            ast.get_docstring(ast.parse(prompt + completion).body[0]),
-            row["instruction"],
-        )
+                self.assertEqual(
+                    prompt, "def identity(value):\n    'Return the input.'\n"
+                )
+                self.assertEqual(completion, "    return value\n")
+                self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
+                self.assertEqual(
+                    ast.get_docstring(ast.parse(prompt + completion).body[0]),
+                    row["instruction"],
+                )
 
     def test_accepts_supported_fences(self):
         for language in ("python", "py", ""):
