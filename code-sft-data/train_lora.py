@@ -156,16 +156,38 @@ def load_lora_model(dtype: Any) -> Any:
     return model
 
 
-def load_full_model(dtype: Any, train_enabled: bool = True) -> Any:
+def load_full_model(
+    dtype: Any,
+    train_enabled: bool = True,
+    config: TrainConfig | None = None,
+) -> Any:
+    import torch
     from transformers import AutoModelForCausalLM
 
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID,
-        revision=MODEL_REVISION,
-        torch_dtype=dtype,
-        use_safetensors=False,
-        trust_remote_code=False,
-    ).to("cuda")
+    if config is not None and config.objective == "nextlat":
+        from nextlat import GPTJNextLatForCausalLM
+
+        model = GPTJNextLatForCausalLM.from_pretrained(
+            MODEL_ID,
+            revision=MODEL_REVISION,
+            torch_dtype=dtype,
+            use_safetensors=False,
+            trust_remote_code=False,
+            nextlat_proj_factor=config.proj_factor,
+            nextlat_zero_init=config.zero_init_dynamics,
+            nextlat_lambda_mse=config.lambda_mse,
+            nextlat_lambda_kl=config.lambda_kl,
+            nextlat_rollout_steps=config.rollout_steps,
+        ).to("cuda")
+        model.nextlat_dynamics.to(dtype=torch.float32)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL_ID,
+            revision=MODEL_REVISION,
+            torch_dtype=dtype,
+            use_safetensors=False,
+            trust_remote_code=False,
+        ).to("cuda")
     if train_enabled:
         model.config.use_cache = False
         model.gradient_checkpointing_enable(
@@ -228,10 +250,8 @@ def compute_answer_nll(
 
 def run_dynamics_warmup_stage(
     model: Any,
-    dynamics_model: Any,
     warmup_batches: list[tuple[list[int], list[int]]],
     config: TrainConfig,
-    eos_token_id: int,
     metrics: Any,
     history: list[dict[str, Any]],
     start_step: int,
@@ -239,7 +259,6 @@ def run_dynamics_warmup_stage(
 ) -> int:
     import torch
     from transformers import get_cosine_schedule_with_warmup
-    from nextlat import compute_dynamics_warmup_losses
 
     warmup_stage_steps = (
         math.ceil(len(warmup_batches) / config.accumulation) * config.warmup_epochs
@@ -249,8 +268,9 @@ def run_dynamics_warmup_stage(
 
     was_use_cache = getattr(model.config, "use_cache", False)
     model.eval()
-    dynamics_model.train()
-    dyn_params = [v for v in dynamics_model.parameters() if v.requires_grad]
+    model.nextlat_dynamics.train()
+    model.warmup_only = True
+    dyn_params = [v for v in model.nextlat_dynamics.parameters() if v.requires_grad]
     optimizer = torch.optim.AdamW(dyn_params, lr=config.warmup_lr, weight_decay=0.01)
     scheduler = get_cosine_schedule_with_warmup(
         optimizer, max(1, int(0.05 * warmup_stage_steps)), warmup_stage_steps
@@ -275,17 +295,13 @@ def run_dynamics_warmup_stage(
             for (ids, labels), count in zip(group, counts):
                 weight = count / sum(counts)
                 with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                    losses = compute_dynamics_warmup_losses(
-                        model,
-                        dynamics_model,
+                    out = model(
                         input_ids=torch.tensor([ids], device="cuda"),
                         labels=torch.tensor([labels], device="cuda"),
-                        eos_token_id=eos_token_id,
-                        rollout_steps=config.rollout_steps,
                     )
-                    mse_loss = losses["mse_loss"]
-                    kl_loss = losses["kl_loss"]
-                    loss = mse_loss + kl_loss
+                    mse_loss = out["mse_loss"]
+                    kl_loss = out["kl_loss"]
+                    loss = out.loss
                 if not torch.isfinite(loss):
                     raise RuntimeError("Nonfinite dynamics warmup loss")
                 (loss * weight).backward()
@@ -317,6 +333,7 @@ def run_dynamics_warmup_stage(
             metrics.flush()
             print(json.dumps(record), flush=True)
 
+    model.warmup_only = False
     model.config.use_cache = was_use_cache
     del optimizer, scheduler
     gc.collect()
@@ -326,14 +343,12 @@ def run_dynamics_warmup_stage(
 
 def run_joint_stage(
     model: Any,
-    dynamics_model: Any,
     stage_batches: list[tuple[list[int], list[int]]],
     stage_epochs: int,
     stage_lr: float,
     phase: str,
     config: TrainConfig,
     val_batches: list[tuple[list[int], list[int]]] | None,
-    eos_token_id: int,
     metrics: Any,
     history: list[dict[str, Any]],
     start_step: int,
@@ -341,7 +356,6 @@ def run_joint_stage(
 ) -> int:
     import torch
     from transformers import get_cosine_schedule_with_warmup
-    from nextlat import compute_nextlat_losses
 
     stage_steps = (
         math.ceil(len(stage_batches) / config.accumulation) * stage_epochs
@@ -351,10 +365,9 @@ def run_joint_stage(
     if stage_steps == 0:
         return start_step
 
+    if hasattr(model, "warmup_only"):
+        model.warmup_only = False
     params = [v for v in model.parameters() if v.requires_grad]
-    if dynamics_model is not None:
-        dynamics_model.train()
-        params.extend(v for v in dynamics_model.parameters() if v.requires_grad)
 
     optimizer = build_optimizer(params, config, lr=stage_lr)
     warmup_steps = max(1, int(0.05 * stage_steps))
@@ -380,31 +393,15 @@ def run_joint_stage(
             for (ids, labels), count in zip(group, counts):
                 weight = count / sum(counts)
                 with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                    if dynamics_model is not None:
-                        losses = compute_nextlat_losses(
-                            model,
-                            dynamics_model,
-                            input_ids=torch.tensor([ids], device="cuda"),
-                            labels=torch.tensor([labels], device="cuda"),
-                            eos_token_id=eos_token_id,
-                            rollout_steps=config.rollout_steps,
-                        )
-                        ntp_loss = losses["ntp_loss"]
-                        mse_loss = losses["mse_loss"]
-                        kl_loss = losses["kl_loss"]
-                        loss = (
-                            ntp_loss
-                            + config.lambda_mse * mse_loss
-                            + config.lambda_kl * kl_loss
-                        )
-                        mse_value += float(mse_loss.detach()) * weight
-                        kl_value += float(kl_loss.detach()) * weight
-                    else:
-                        ntp_loss = model(
-                            input_ids=torch.tensor([ids], device="cuda"),
-                            labels=torch.tensor([labels], device="cuda"),
-                        ).loss
-                        loss = ntp_loss
+                    out = model(
+                        input_ids=torch.tensor([ids], device="cuda"),
+                        labels=torch.tensor([labels], device="cuda"),
+                    )
+                    loss = out.loss
+                    ntp_loss = out["ntp_loss"] if "ntp_loss" in out else loss
+                    if "mse_loss" in out and "kl_loss" in out:
+                        mse_value += float(out["mse_loss"].detach()) * weight
+                        kl_value += float(out["kl_loss"].detach()) * weight
                 if not torch.isfinite(loss):
                     raise RuntimeError("Nonfinite loss")
                 (loss * weight).backward()
@@ -428,7 +425,7 @@ def run_joint_stage(
                 grad_norm=float(norm),
                 learning_rate=float(scheduler.get_last_lr()[0]),
             )
-            if dynamics_model is not None:
+            if hasattr(model, "nextlat_dynamics"):
                 record.update(
                     nextlat_mse_loss=mse_value,
                     nextlat_kl_loss=kl_value,
@@ -456,9 +453,8 @@ def run_training_loop(
     batches: list[tuple[list[int], list[int]]],
     config: TrainConfig,
     val_batches: list[tuple[list[int], list[int]]] | None = None,
-    eos_token_id: int = 50256,
     warmup_batches: list[tuple[list[int], list[int]]] | None = None,
-) -> tuple[int, list[dict[str, Any]], Any]:
+) -> tuple[int, list[dict[str, Any]]]:
     import torch
 
     history: list[dict[str, Any]] = []
@@ -495,27 +491,14 @@ def run_training_loop(
             print(json.dumps(init_record), flush=True)
 
         if total_steps == 0:
-            return 0, history, None
-
-        dynamics_model = None
-        if config.objective == "nextlat":
-            from nextlat import create_dynamics_model
-
-            dynamics_model = create_dynamics_model(
-                n_embd=model.config.n_embd,
-                proj_factor=config.proj_factor,
-                zero_init_output=config.zero_init_dynamics,
-            ).to(device="cuda", dtype=torch.float32)
-            dynamics_model.train()
+            return 0, history
 
         step = 0
-        if warmup_steps > 0 and dynamics_model is not None:
+        if warmup_steps > 0 and hasattr(model, "nextlat_dynamics"):
             step = run_dynamics_warmup_stage(
                 model=model,
-                dynamics_model=dynamics_model,
                 warmup_batches=active_warmup,
                 config=config,
-                eos_token_id=eos_token_id,
                 metrics=metrics,
                 history=history,
                 start_step=step,
@@ -525,14 +508,12 @@ def run_training_loop(
         if cpt_steps > 0:
             step = run_joint_stage(
                 model=model,
-                dynamics_model=dynamics_model,
                 stage_batches=active_warmup,
                 stage_epochs=config.cpt_epochs,
                 stage_lr=config.cpt_lr,
                 phase="repo_cpt",
                 config=config,
                 val_batches=val_batches,
-                eos_token_id=eos_token_id,
                 metrics=metrics,
                 history=history,
                 start_step=step,
@@ -542,14 +523,12 @@ def run_training_loop(
         if sft_steps > 0:
             step = run_joint_stage(
                 model=model,
-                dynamics_model=dynamics_model,
                 stage_batches=batches,
                 stage_epochs=config.epochs,
                 stage_lr=config.learning_rate,
                 phase="sft",
                 config=config,
                 val_batches=val_batches,
-                eos_token_id=eos_token_id,
                 metrics=metrics,
                 history=history,
                 start_step=step,
@@ -558,7 +537,7 @@ def run_training_loop(
 
     gc.collect()
     torch.cuda.empty_cache()
-    return step, history, dynamics_model
+    return step, history
 
 
 def run_post_training_evals(
@@ -624,7 +603,11 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
         model = load_lora_model(dtype)
     else:
         dtype = torch.float32 if config.epochs > 0 else torch.bfloat16
-        model = load_full_model(dtype, train_enabled=config.epochs > 0)
+        model = load_full_model(
+            dtype,
+            train_enabled=config.epochs > 0,
+            config=config,
+        )
 
     config.output.mkdir(parents=True)
     metadata = dict(
@@ -655,12 +638,11 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
         metadata.update(rank=8, alpha=16, target_modules=["q_proj", "v_proj"])
     (config.output / "config.json").write_text(json.dumps(metadata, indent=2))
 
-    steps, history, dynamics_model = run_training_loop(
+    steps, history = run_training_loop(
         model,
         train_batches,
         config,
         val_batches,
-        eos_token_id=tokenizer.eos_token_id,
         warmup_batches=warmup_batches,
     )
 
@@ -672,25 +654,18 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
             config.output / "checkpoint", safe_serialization=True
         )
         tokenizer.save_pretrained(config.output / "checkpoint")
-        if dynamics_model is not None:
-            torch.save(
-                dynamics_model.state_dict(),
-                config.output / "checkpoint" / "dynamics_model.pt",
-            )
 
     if config.hf_repo:
         model.to(torch.bfloat16).push_to_hub(config.hf_repo, safe_serialization=True)
         tokenizer.push_to_hub(config.hf_repo)
 
     spec_decode_summary = None
-    if config.spec_decode_benchmark and dynamics_model is not None:
-        from evaluate import prepare_benchmark
-        from nextlat import run_speculative_decoding_benchmark
+    if config.spec_decode_benchmark and hasattr(model, "nextlat_dynamics"):
+        from evaluate import prepare_benchmark, run_speculative_decoding_benchmark
 
         if hasattr(model, "gradient_checkpointing_disable"):
             model.gradient_checkpointing_disable()
         model = model.to(torch.bfloat16).eval()
-        dynamics_model = dynamics_model.to(torch.bfloat16).eval()
 
         is_humaneval = config.spec_decode_benchmark.lower() == "humaneval"
         spec_dir = config.output / "spec_decode_eval"
@@ -702,7 +677,6 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
 
         spec_decode_summary = run_speculative_decoding_benchmark(
             model=model,
-            dynamics_model=dynamics_model,
             tokenizer=tokenizer,
             prompts=prompts,
             max_new_tokens=config.spec_decode_max_tokens,
@@ -721,7 +695,6 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
             flush=True,
         )
 
-    del dynamics_model
     gc.collect()
     torch.cuda.empty_cache()
 

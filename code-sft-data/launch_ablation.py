@@ -337,6 +337,24 @@ def build_arms(config: AblationConfig) -> list[ArmSpec]:
             val_every=100,
             learning_rate=config.learning_rate,
         ),
+        "spec-humaneval-rollout3-10000": ArmSpec(
+            name="spec-humaneval-rollout3-10000",
+            train_size=10000,
+            train_file=config.splits_dir / "train-10000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=3,
+            spec_decode=True,
+            spec_decode_benchmark="humaneval",
+            run_evals=False,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=100,
+            learning_rate=config.learning_rate,
+        ),
     }
     return [specs[name] for name in config.arms]
 
@@ -490,7 +508,8 @@ def run_arm_in_sandbox(
                 f"zipfile.ZipFile(io.BytesIO(urllib.request.urlopen('{HUMAN_EVAL_ZIP}').read())).extractall('/tmp/work')\""
             )
             install_cmd = (
-                "pip install -q transformers==4.56.2 peft==0.17.1 "
+                "(command -v uv >/dev/null 2>&1 || pip install -q --root-user-action=ignore uv) && "
+                "uv pip install --system -q transformers==4.56.2 peft==0.17.1 "
                 "accelerate==1.10.1 bitsandbytes==0.48.1 pydantic==2.12.3 fire && "
                 + extract_he
             )

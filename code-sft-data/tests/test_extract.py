@@ -9,10 +9,11 @@ from textwrap import dedent
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_repo_warmup import extract_repo_function
+from evaluate import truncate_at_stops
 from generate_splits import choose, extract
 from generate_tests import build_mutants, extract_check_function
 from launch_ablation import paired_bootstrap_ci, pass_at_k
-from nextlat import build_nextlat_mask, truncate_at_stops
+from nextlat import build_nextlat_mask
 from train_lora import parse_args as parse_train_args
 
 
@@ -508,6 +509,37 @@ class ExtractTests(unittest.TestCase):
                 truncate_at_stops("    return x + 1\n\ndef helper():\n    pass\n"),
                 "    return x + 1\n",
             )
+
+    def test_gptj_nextlat_causal_lm_subclass(self):
+        try:
+            import torch
+            from nextlat import GPTJNextLatConfig, GPTJNextLatForCausalLM
+        except ImportError:
+            self.skipTest("torch/transformers not installed in local CPU test venv")
+
+        torch.manual_seed(7)
+        cfg = GPTJNextLatConfig(
+            vocab_size=32,
+            n_embd=16,
+            n_layer=2,
+            n_head=2,
+            rotary_dim=4,
+            eos_token_id=0,
+            pad_token_id=0,
+            nextlat_rollout_steps=2,
+        )
+        model = GPTJNextLatForCausalLM(cfg).eval()
+        input_ids = torch.tensor([[1, 2, 3, 4, 5, 0]])
+        labels = torch.tensor([[-100, -100, 3, 4, 5, 0]])
+        out = model(input_ids=input_ids, labels=labels, nextlat_masks=[[False, True, True, True]])
+        self.assertIsNotNone(out.loss)
+
+        prompt = torch.tensor([[1, 2, 3]])
+        greedy_ids = model.generate(prompt, max_new_tokens=6, do_sample=False)
+        spec_ids = model.generate(
+            prompt, max_new_tokens=6, do_sample=False, num_assistant_tokens=2
+        )
+        self.assertTrue(torch.equal(greedy_ids, spec_ids))
 
 
 if __name__ == "__main__":

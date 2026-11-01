@@ -123,6 +123,21 @@ Because `NextLatDynamicsModel` (`~67M` parameters, $90\times$ smaller than GPT-J
 | `spec-humaneval-rollout3-1000` *(Joint 3-step)* | $K=3$ | **`76.7% / 57.3% / 43.0%`** | `2.69` (`5,326` fwds) | `128.1 tok/s` | **`2.46x`** | `9.15%` | [`51g4bv0c`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/51g4bv0c) |
 | `spec-humaneval-rollout3-1000` *(Joint 3-step)* | $K=4$ | **`73.0% / 53.2% / 39.7% / 28.7%`** | **`2.84`** (`4,953` fwds) | **`133.2 tok/s`** | **`2.56x`** | `9.15%` | [`51g4bv0c`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/51g4bv0c) |
 
+#### Scaling to `10,000` SFT Trajectories on `HumanEval` (164 Tasks, `max_new_tokens=128`)
+
+| Arm (`10,000` SFT Trajectories) | Draft $K$ | Pos-1 / Pos-2 / Pos-3 / Pos-4 Acceptance | Tokens / GPT-J Forward | Throughput (`tok/s`) | Wall-Clock Speedup | Greedy `pass@1` | W&B Run |
+|---|---:|---|---:|---:|---:|---:|---|
+| **`spec-humaneval-rollout1-10000`** *(Joint 1-step)* | $K=0$ (Greedy) | — | `1.00` (`12,336` fwds) | `56.3 tok/s` | `1.00x` | `13.41%` | [`mw1x12mv`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/mw1x12mv) |
+| `spec-humaneval-rollout1-10000` *(Joint 1-step)* | $K=1$ | **`88.4%`** | `1.86` (`6,746` fwds) | `94.1 tok/s` | **`1.67x`** | `13.41%` | [`mw1x12mv`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/mw1x12mv) |
+| `spec-humaneval-rollout1-10000` *(Joint 1-step)* | $K=2$ | `86.2% / 42.4%` | `2.24` (`5,573` fwds) | `108.6 tok/s` | **`1.93x`** | `13.41%` | [`mw1x12mv`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/mw1x12mv) |
+| `spec-humaneval-rollout1-10000` *(Joint 1-step)* | $K=3$ | `85.3% / 41.2% / 22.9%` | `2.43` (`5,104` fwds) | `114.8 tok/s` | **`2.04x`** | `13.41%` | [`mw1x12mv`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/mw1x12mv) |
+| `spec-humaneval-rollout1-10000` *(Joint 1-step)* | $K=4$ | `84.2% / 38.3% / 19.8% / 14.8%` | `2.50` (`4,938` fwds) | `116.2 tok/s` | **`2.06x`** | `13.41%` | [`mw1x12mv`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/mw1x12mv) |
+| **`spec-humaneval-rollout3-10000`** *(Joint 3-step)* | $K=0$ (Greedy) | — | `1.00` (`12,489` fwds) | `52.0 tok/s` | `1.00x` | `13.41%` | [`5g754cmg`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/5g754cmg) |
+| `spec-humaneval-rollout3-10000` *(Joint 3-step)* | $K=1$ | **`87.3%`** | `1.85` (`6,744` fwds) | `88.2 tok/s` | **`1.70x`** | `14.02%` | [`5g754cmg`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/5g754cmg) |
+| `spec-humaneval-rollout3-10000` *(Joint 3-step)* | $K=2$ | **`86.3% / 72.1%`** | `2.52` (`4,910` fwds) | `116.5 tok/s` | **`2.24x`** | `14.02%` | [`5g754cmg`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/5g754cmg) |
+| `spec-humaneval-rollout3-10000` *(Joint 3-step)* | $K=3$ | **`84.9% / 70.8% / 57.4%`** | `3.03` (`4,154` fwds) | `138.4 tok/s` | **`2.66x`** | `13.41%` | [`5g754cmg`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/5g754cmg) |
+| `spec-humaneval-rollout3-10000` *(Joint 3-step)* | $K=4$ | **`83.9% / 68.4% / 55.0% / 40.8%`** | **`3.34`** (`3,707` fwds) | **`149.7 tok/s`** | **`2.88x`** | `14.63%` | [`5g754cmg`](https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/5g754cmg) |
+
 ### 4.2 In-Domain `test-100` (100 Tasks, `max_new_tokens=128`)
 
 | Arm (`1,000` SFT Trajectories) | Draft $K$ | Pos-1 / Pos-2 / Pos-3 / Pos-4 Acceptance | Tokens / GPT-J Forward | Throughput (`tok/s`) | Wall-Clock Speedup | W&B Run |
@@ -148,6 +163,8 @@ Because `NextLatDynamicsModel` (`~67M` parameters, $90\times$ smaller than GPT-J
      - At **100 examples**, `nextlat-warmup-sft-100` **beats `full-sft-100` on `HumanEval pass@1`** (`7.01%` vs `5.27%`, `+1.74%`, 95% CI `[+0.09%, +3.78%]`) and `test-100 pass@10` (`22.47%` vs `20.84%`).
      - At **1,000 examples**, `test-100 pass@1` nearly doubles over cold-start (`12.35% -> 23.00%–23.70%`, **`+10.65% to +11.35%`**), matching `full-sft-1000` within statistical noise (all 95% CIs overlap zero).
      - At **10,000 examples**, `nextlat-warmup-sft-10000` achieves **`40.85%` `pass@1` on `test-100`**—**the highest `pass@1` score of any model in the entire study**, beating cold-start `nextlat-sft-10000` (`29.70%`) by **`+11.15%`** and surpassing `full-sft-10000` (`38.60%`) by **`+2.25%`** (`+23.10%` over the `17.75%` base GPT-J model).
-3. **Free `2.05x–2.56x` Lossless Speculative Decoding Trained from Scratch in 1,000 SFT Trajectories:**
-   - Training `NextLatDynamicsModel` jointly during SFT co-adapts GPT-J's hidden states $h_t$ and the 67M drafter head: on `HumanEval`, step-1 draft acceptance jumps from **`49.6%`** (frozen GPT-J drafter, max `1.64x` speedup) to **`81.1%–83.1%`** (joint NextLat SFT).
-   - Adding a 3-step latent rollout (`--rollout-steps 3`) during training nearly doubles multi-step acceptance at positions 2–4 (`53.2% / 39.7% / 28.7%` on `HumanEval` at $K=4$), cutting 6B target forward passes by **`2.88x`** (`14,241 -> 4,953`) and achieving a **`2.56x` wall-clock speedup (`52.1 -> 133.2 tok/s`) on `HumanEval`** and **`2.39x` speedup (`48.0 -> 114.6 tok/s`) on `test-100`** with lossless functional `pass@1`.
+3. **Free `2.05x–2.88x` Lossless Speculative Decoding via Native Hugging Face `GPTJNextLatForCausalLM`:**
+   - Training `NextLatDynamicsModel` jointly during SFT co-adapts GPT-J's hidden states $h_t$ and the 67M drafter head: on `HumanEval`, step-1 draft acceptance jumps from **`49.6%`** (frozen GPT-J drafter, max `1.64x` speedup) to **`81.1%–83.1%`** at 1,000 SFT trajectories and **`87.3%–88.4%`** at 10,000 SFT trajectories.
+   - Adding a 3-step latent rollout (`--rollout-steps 3`) during training nearly doubles multi-step acceptance at positions 2–4:
+     - At **1,000 SFT trajectories** (`spec-humaneval-rollout3-1000`), acceptance reaches `73.0% / 53.2% / 39.7% / 28.7%` at $K=4$, yielding **`2.84` tokens/forward** and a **`2.56x` wall-clock speedup (`52.1 -> 133.2 tok/s`) on `HumanEval`** (`2.39x` on `test-100`).
+     - At **10,000 SFT trajectories** (`spec-humaneval-rollout3-10000`), acceptance climbs further to **`83.9% / 68.4% / 55.0% / 40.8%`** at $K=4$, cutting 6B target forward passes by **`3.37x`** (`12,489 -> 3,707` fwds, **`3.34` tokens/forward**) and achieving a **`2.88x` wall-clock speedup (`52.0 -> 149.7 tok/s`) on `HumanEval`** while improving functional `pass@1` from `8.54%` (1k) to **`13.41%–14.63%`** (10k).

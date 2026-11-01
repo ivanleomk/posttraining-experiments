@@ -33,6 +33,12 @@ MODEL_REVISION = "47e169305d2e8376be1d31e765533382721b2cc1"
 STOPS = ["\nclass", "\ndef", "\n#", "\nif", "\nprint"]
 
 
+def truncate_at_stops(text: str, stops: list[str] = STOPS) -> str:
+    """Truncate generated completion at the first occurrence of any stop string."""
+    indices = [text.find(s) for s in stops if s in text]
+    return text[: min(indices)] if indices else text
+
+
 class EvalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     output: Path
@@ -284,6 +290,182 @@ def run_benchmark_eval(
         elapsed_seconds=time.monotonic() - start,
     )
     (config.output / "summary.json").write_text(json.dumps(summary, indent=2))
+    return summary
+
+
+def run_speculative_decoding_benchmark(
+    model: Any,
+    tokenizer: Any,
+    prompts: list[str],
+    max_new_tokens: int = 128,
+    draft_ks: tuple[int, ...] = (1, 2, 3, 4),
+    task_ids: list[str] | None = None,
+    problem_file: Path | None = None,
+    output_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Benchmark standard model.generate() (K=0 greedy vs K=1..4 NextLat speculative decoding)."""
+    import torch
+    from human_eval.evaluation import evaluate_functional_correctness
+
+    was_cache = getattr(model.config, "use_cache", False)
+    model.config.use_cache = True
+    model.eval()
+    eos_id = tokenizer.eos_token_id
+    device = model.device
+
+    if prompts:
+        warm = torch.tensor(
+            [tokenizer(prompts[0], add_special_tokens=False)["input_ids"]],
+            device=device,
+        )
+        model.generate(input_ids=warm, max_new_tokens=8, do_sample=False)
+        model.generate(
+            input_ids=warm, max_new_tokens=8, do_sample=False, num_assistant_tokens=2
+        )
+
+    baseline_tokens: list[list[int]] = []
+    base_total_tokens = 0
+    base_total_sec = 0.0
+
+    for prompt in prompts:
+        ids = torch.tensor(
+            [tokenizer(prompt, add_special_tokens=False)["input_ids"]], device=device
+        )
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        out = model.generate(
+            input_ids=ids,
+            attention_mask=torch.ones_like(ids),
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=eos_id,
+            eos_token_id=eos_id,
+        )
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        base_total_sec += time.perf_counter() - t0
+        toks = out[0, ids.size(1) :].tolist()
+        baseline_tokens.append(toks)
+        base_total_tokens += len(toks)
+
+    base_tps = base_total_tokens / max(base_total_sec, 1e-9)
+    greedy_summary: dict[str, Any] = {
+        "total_tokens": base_total_tokens,
+        "target_forwards": base_total_tokens,
+        "elapsed_seconds": base_total_sec,
+        "tokens_per_sec": base_tps,
+        "tokens_per_target_forward": 1.0,
+    }
+
+    if task_ids is not None and problem_file is not None and output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        greedy_path = output_dir / "greedy_samples.jsonl"
+        with greedy_path.open("w") as f:
+            for tid, toks in zip(task_ids, baseline_tokens):
+                raw = tokenizer.decode(toks, skip_special_tokens=True)
+                f.write(
+                    json.dumps({"task_id": tid, "completion": truncate_at_stops(raw)})
+                    + "\n"
+                )
+        greedy_summary["pass@1"] = float(
+            evaluate_functional_correctness(
+                str(greedy_path),
+                k=[1],
+                n_workers=4,
+                timeout=3,
+                problem_file=str(problem_file),
+            )["pass@1"]
+        )
+
+    summary: dict[str, Any] = {
+        "tasks": len(prompts),
+        "max_new_tokens": max_new_tokens,
+        "greedy_baseline": greedy_summary,
+        "speculative": {},
+    }
+
+    for k in draft_ks:
+        total_tokens = 0
+        total_forwards = 0
+        total_steps = 0
+        total_proposed = 0
+        total_accepted = 0
+        acc_by_pos = [0] * k
+        prop_by_pos = [0] * k
+        total_sec = 0.0
+        exact_matches = 0
+        spec_tokens_list: list[list[int]] = []
+
+        for idx, prompt in enumerate(prompts):
+            ids = torch.tensor(
+                [tokenizer(prompt, add_special_tokens=False)["input_ids"]],
+                device=device,
+            )
+            out = model.generate(
+                input_ids=ids,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                num_assistant_tokens=k,
+            )
+            toks = out[0, ids.size(1) :].tolist()
+            st = model.last_gen_stats
+            spec_tokens_list.append(toks)
+            if toks == baseline_tokens[idx]:
+                exact_matches += 1
+            total_tokens += len(toks)
+            total_forwards += st["target_forwards"]
+            total_steps += st["draft_steps"]
+            total_proposed += st["draft_tokens_proposed"]
+            total_accepted += st["draft_tokens_accepted"]
+            total_sec += st["elapsed_seconds"]
+            for j in range(k):
+                acc_by_pos[j] += st["accepted_by_pos"][j]
+                prop_by_pos[j] += st["proposed_by_pos"][j]
+
+        tps = total_tokens / max(total_sec, 1e-9)
+        k_entry: dict[str, Any] = {
+            "draft_k": k,
+            "total_tokens": total_tokens,
+            "target_forwards": total_forwards,
+            "draft_steps": total_steps,
+            "draft_tokens_proposed": total_proposed,
+            "draft_tokens_accepted": total_accepted,
+            "overall_acceptance_rate": total_accepted / max(total_proposed, 1),
+            "mean_accepted_per_step": total_accepted / max(total_steps, 1),
+            "tokens_per_target_forward": total_tokens / max(total_forwards, 1),
+            "forward_pass_reduction_factor": base_total_tokens / max(total_forwards, 1),
+            "acceptance_rate_by_pos": [
+                acc_by_pos[j] / max(prop_by_pos[j], 1) for j in range(k)
+            ],
+            "elapsed_seconds": total_sec,
+            "tokens_per_sec": tps,
+            "speedup_vs_greedy": tps / max(base_tps, 1e-9),
+            "exact_token_match_rate": exact_matches / max(len(prompts), 1),
+        }
+        if task_ids is not None and problem_file is not None and output_dir is not None:
+            k_path = output_dir / f"spec_k{k}_samples.jsonl"
+            with k_path.open("w") as f:
+                for tid, toks in zip(task_ids, spec_tokens_list):
+                    raw = tokenizer.decode(toks, skip_special_tokens=True)
+                    f.write(
+                        json.dumps(
+                            {"task_id": tid, "completion": truncate_at_stops(raw)}
+                        )
+                        + "\n"
+                    )
+            k_entry["pass@1"] = float(
+                evaluate_functional_correctness(
+                    str(k_path),
+                    k=[1],
+                    n_workers=4,
+                    timeout=3,
+                    problem_file=str(problem_file),
+                )["pass@1"]
+            )
+        summary["speculative"][f"k={k}"] = k_entry
+
+    model.config.use_cache = was_cache
     return summary
 
 
