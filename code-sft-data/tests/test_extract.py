@@ -12,7 +12,7 @@ from build_repo_warmup import extract_repo_function
 from generate_splits import choose, extract
 from generate_tests import build_mutants, extract_check_function
 from launch_ablation import paired_bootstrap_ci, pass_at_k
-from nextlat import build_nextlat_mask
+from nextlat import build_nextlat_mask, truncate_at_stops
 from train_lora import parse_args as parse_train_args
 
 
@@ -490,6 +490,24 @@ class ExtractTests(unittest.TestCase):
             self.assertEqual(cfg.cpt_epochs, 1)
             self.assertAlmostEqual(cfg.lambda_mse, 0.2)
             self.assertAlmostEqual(cfg.lambda_kl, 0.1)
+
+            spec_cfg = parse_train_args(
+                [
+                    "--mode",
+                    "full",
+                    "--objective",
+                    "nextlat",
+                    "--spec-decode-benchmark",
+                    "humaneval",
+                    "--output",
+                    str(root / "out_spec"),
+                ]
+            )
+            self.assertEqual(spec_cfg.spec_decode_benchmark, "humaneval")
+            self.assertEqual(
+                truncate_at_stops("    return x + 1\n\ndef helper():\n    pass\n"),
+                "    return x + 1\n",
+            )
 
 
 if __name__ == "__main__":

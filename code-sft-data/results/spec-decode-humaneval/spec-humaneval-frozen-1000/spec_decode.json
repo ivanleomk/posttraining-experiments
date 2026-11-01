@@ -1,0 +1,101 @@
+{
+  "tasks": 164,
+  "max_new_tokens": 128,
+  "greedy_baseline": {
+    "total_tokens": 20967,
+    "target_forwards": 20967,
+    "elapsed_seconds": 378.95386410900045,
+    "tokens_per_sec": 55.32863492313976,
+    "tokens_per_target_forward": 1.0,
+    "pass@1": 0.11585365853658537
+  },
+  "speculative": {
+    "k=1": {
+      "draft_k": 1,
+      "total_tokens": 20967,
+      "target_forwards": 14107,
+      "draft_steps": 13943,
+      "draft_tokens_proposed": 13943,
+      "draft_tokens_accepted": 6911,
+      "overall_acceptance_rate": 0.4956609051136771,
+      "mean_accepted_per_step": 0.4956609051136771,
+      "tokens_per_target_forward": 1.4862834054015737,
+      "forward_pass_reduction_factor": 1.4862834054015737,
+      "acceptance_rate_by_pos": [
+        0.4956609051136771
+      ],
+      "elapsed_seconds": 273.01911492700026,
+      "tokens_per_sec": 76.79682063875326,
+      "speedup_vs_greedy": 1.3880122064358937,
+      "exact_token_match_rate": 0.7987804878048781,
+      "pass@1": 0.12195121951219512
+    },
+    "k=2": {
+      "draft_k": 2,
+      "total_tokens": 20967,
+      "target_forwards": 12324,
+      "draft_steps": 12160,
+      "draft_tokens_proposed": 24222,
+      "draft_tokens_accepted": 8704,
+      "overall_acceptance_rate": 0.3593427462637272,
+      "mean_accepted_per_step": 0.7157894736842105,
+      "tokens_per_target_forward": 1.7013145082765335,
+      "forward_pass_reduction_factor": 1.7013145082765335,
+      "acceptance_rate_by_pos": [
+        0.4393092105263158,
+        0.2787265793400763
+      ],
+      "elapsed_seconds": 245.12471549299812,
+      "tokens_per_sec": 85.53605032373373,
+      "speedup_vs_greedy": 1.5459635041160307,
+      "exact_token_match_rate": 0.7560975609756098,
+      "pass@1": 0.12195121951219512
+    },
+    "k=3": {
+      "draft_k": 3,
+      "total_tokens": 20946,
+      "target_forwards": 11494,
+      "draft_steps": 11330,
+      "draft_tokens_proposed": 33702,
+      "draft_tokens_accepted": 9517,
+      "overall_acceptance_rate": 0.2823868019702095,
+      "mean_accepted_per_step": 0.839982347749338,
+      "tokens_per_target_forward": 1.8223420915260136,
+      "forward_pass_reduction_factor": 1.824169131720898,
+      "acceptance_rate_by_pos": [
+        0.4119152691968226,
+        0.25166918899670615,
+        0.18161414848729687
+      ],
+      "elapsed_seconds": 236.29869006700005,
+      "tokens_per_sec": 88.64204873104028,
+      "speedup_vs_greedy": 1.602100772126009,
+      "exact_token_match_rate": 0.7317073170731707,
+      "pass@1": 0.12195121951219512
+    },
+    "k=4": {
+      "draft_k": 4,
+      "total_tokens": 20967,
+      "target_forwards": 11154,
+      "draft_steps": 10990,
+      "draft_tokens_proposed": 43378,
+      "draft_tokens_accepted": 9884,
+      "overall_acceptance_rate": 0.22785743925492186,
+      "mean_accepted_per_step": 0.8993630573248408,
+      "tokens_per_target_forward": 1.8797740720817644,
+      "forward_pass_reduction_factor": 1.8797740720817644,
+      "acceptance_rate_by_pos": [
+        0.38944494995450407,
+        0.23459737397851438,
+        0.1727331666203575,
+        0.11065420560747663
+      ],
+      "elapsed_seconds": 230.48819901900129,
+      "tokens_per_sec": 90.96778095034486,
+      "speedup_vs_greedy": 1.6441356465185437,
+      "exact_token_match_rate": 0.725609756097561,
+      "pass@1": 0.12195121951219512
+    }
+  },
+  "benchmark": "humaneval"
+}

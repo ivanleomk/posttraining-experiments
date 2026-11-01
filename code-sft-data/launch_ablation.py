@@ -33,6 +33,10 @@ class ArmSpec(BaseModel):
     cpt_epochs: int = 0
     cpt_lr: float = 5e-6
     zero_init_dynamics: bool = False
+    rollout_steps: int = 1
+    spec_decode: bool = False
+    spec_decode_benchmark: str = "/tmp/work/test-100.jsonl"
+    run_evals: bool = True
     lambda_mse: float | None = None
     lambda_kl: float | None = None
     epochs: int
@@ -204,6 +208,129 @@ def build_arms(config: AblationConfig) -> list[ArmSpec]:
             warmup_epochs=1,
             warmup_lr=1e-4,
             zero_init_dynamics=True,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=100,
+            learning_rate=config.learning_rate,
+        ),
+        "spec-frozen-drafter-1000": ArmSpec(
+            name="spec-frozen-drafter-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=config.splits_dir / "train-1000.jsonl",
+            warmup_epochs=2,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=3,
+            spec_decode=True,
+            run_evals=False,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=0,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "spec-joint-rollout1-1000": ArmSpec(
+            name="spec-joint-rollout1-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=1,
+            spec_decode=True,
+            run_evals=False,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "spec-joint-rollout3-1000": ArmSpec(
+            name="spec-joint-rollout3-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=3,
+            spec_decode=True,
+            run_evals=True,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "spec-humaneval-frozen-1000": ArmSpec(
+            name="spec-humaneval-frozen-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=config.splits_dir / "train-1000.jsonl",
+            warmup_epochs=2,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=3,
+            spec_decode=True,
+            spec_decode_benchmark="humaneval",
+            run_evals=False,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=0,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "spec-humaneval-rollout1-1000": ArmSpec(
+            name="spec-humaneval-rollout1-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=1,
+            spec_decode=True,
+            spec_decode_benchmark="humaneval",
+            run_evals=False,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "spec-humaneval-rollout3-1000": ArmSpec(
+            name="spec-humaneval-rollout3-1000",
+            train_size=1000,
+            train_file=config.splits_dir / "train-1000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=3,
+            spec_decode=True,
+            spec_decode_benchmark="humaneval",
+            run_evals=False,
+            lambda_mse=0.2,
+            lambda_kl=0.1,
+            epochs=1,
+            val_every=25,
+            learning_rate=config.learning_rate,
+        ),
+        "spec-humaneval-rollout1-10000": ArmSpec(
+            name="spec-humaneval-rollout1-10000",
+            train_size=10000,
+            train_file=config.splits_dir / "train-10000.jsonl",
+            warmup_file=warmup_file,
+            warmup_epochs=1,
+            warmup_lr=1e-4,
+            zero_init_dynamics=True,
+            rollout_steps=1,
+            spec_decode=True,
+            spec_decode_benchmark="humaneval",
+            run_evals=False,
             lambda_mse=0.2,
             lambda_kl=0.1,
             epochs=1,
@@ -384,6 +511,8 @@ def run_arm_in_sandbox(
                     "lambda_kl": eff_lambda_kl,
                     "proj_factor": config.proj_factor,
                     "zero_init_dynamics": arm.zero_init_dynamics,
+                    "rollout_steps": arm.rollout_steps,
+                    "spec_decode": arm.spec_decode,
                     "warmup_epochs": arm.warmup_epochs,
                     "warmup_lr": arm.warmup_lr,
                     "cpt_epochs": arm.cpt_epochs,
@@ -406,6 +535,7 @@ def run_arm_in_sandbox(
                 f"--lambda-mse {eff_lambda_mse}",
                 f"--lambda-kl {eff_lambda_kl}",
                 f"--proj-factor {config.proj_factor}",
+                f"--rollout-steps {arm.rollout_steps}",
                 f"--warmup-epochs {arm.warmup_epochs}",
                 f"--warmup-lr {arm.warmup_lr}",
                 f"--cpt-epochs {arm.cpt_epochs}",
@@ -417,9 +547,18 @@ def run_arm_in_sandbox(
                 f"--accumulation {arm.accumulation}",
                 f"--val-every {arm.val_every}",
                 f"--seed {config.seed}",
-                "--eval-benchmark /tmp/work/test-100.jsonl",
-                "--eval-benchmark humaneval",
             ]
+            if arm.run_evals:
+                train_args.extend(
+                    [
+                        "--eval-benchmark /tmp/work/test-100.jsonl",
+                        "--eval-benchmark humaneval",
+                    ]
+                )
+            if arm.spec_decode:
+                train_args.append(
+                    f"--spec-decode-benchmark {arm.spec_decode_benchmark}"
+                )
             if arm.zero_init_dynamics:
                 train_args.append("--zero-init-dynamics")
             if arm.warmup_file:
@@ -499,6 +638,7 @@ def run_arm_in_sandbox(
             )
             download_if_exists(sb, "/tmp/work/out/config.json", arm_dir / "config.json")
             download_if_exists(sb, "/tmp/work/out/metrics.jsonl", arm_dir / "metrics.jsonl")
+            download_if_exists(sb, "/tmp/work/out/spec_decode.json", arm_dir / "spec_decode.json")
             for bench in ("eval_test_100", "eval_humaneval"):
                 for fname in (
                     "summary.json",
@@ -526,6 +666,19 @@ def run_arm_in_sandbox(
             for bench_name, scores in summary.get("evaluations", {}).items():
                 for metric, val in scores.items():
                     wb_run.summary[f"{bench_name}/{metric}"] = val
+            if summary.get("speculative_decoding"):
+                sd = summary["speculative_decoding"]
+                wb_run.summary["spec_decode/greedy_tokens_per_sec"] = sd["greedy_baseline"]["tokens_per_sec"]
+                if "pass@1" in sd["greedy_baseline"]:
+                    wb_run.summary["spec_decode/greedy_pass@1"] = sd["greedy_baseline"]["pass@1"]
+                for k_key, k_stats in sd.get("speculative", {}).items():
+                    wb_run.summary[f"spec_decode/{k_key}/speedup"] = k_stats["speedup_vs_greedy"]
+                    wb_run.summary[f"spec_decode/{k_key}/tokens_per_sec"] = k_stats["tokens_per_sec"]
+                    wb_run.summary[f"spec_decode/{k_key}/acceptance_rate"] = k_stats["overall_acceptance_rate"]
+                    wb_run.summary[f"spec_decode/{k_key}/tokens_per_forward"] = k_stats["tokens_per_target_forward"]
+                    wb_run.summary[f"spec_decode/{k_key}/exact_match_rate"] = k_stats["exact_token_match_rate"]
+                    if "pass@1" in k_stats:
+                        wb_run.summary[f"spec_decode/{k_key}/pass@1"] = k_stats["pass@1"]
             if summary.get("final_metrics", {}) and "val_answer_token_nll" in summary["final_metrics"]:
                 wb_run.summary["val/final_answer_token_nll"] = summary["final_metrics"]["val_answer_token_nll"]
             print(

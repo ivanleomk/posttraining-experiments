@@ -32,6 +32,7 @@ class TrainConfig(BaseModel):
     lambda_mse: float = Field(default=1.0, ge=0, allow_inf_nan=False)
     lambda_kl: float = Field(default=1.0, ge=0, allow_inf_nan=False)
     proj_factor: float = Field(default=0.5, gt=0, allow_inf_nan=False)
+    rollout_steps: int = Field(default=1, ge=1)
     zero_init_dynamics: bool = False
     warmup_epochs: int = Field(default=0, ge=0)
     warmup_lr: float = Field(default=1e-4, gt=0, allow_inf_nan=False)
@@ -42,6 +43,8 @@ class TrainConfig(BaseModel):
     accumulation: int = Field(default=4, ge=1)
     val_every: int = Field(default=25, ge=1)
     eval_benchmarks: list[str] = Field(default_factory=list)
+    spec_decode_benchmark: str | None = None
+    spec_decode_max_tokens: int = Field(default=128, ge=1)
     save_checkpoint: bool = False
     hf_repo: str | None = None
     seed: int = 42
@@ -58,6 +61,7 @@ def parse_args(argv: list[str] | None = None) -> TrainConfig:
     p.add_argument("--lambda-mse", type=float, default=1.0)
     p.add_argument("--lambda-kl", type=float, default=1.0)
     p.add_argument("--proj-factor", type=float, default=0.5)
+    p.add_argument("--rollout-steps", type=int, default=1)
     p.add_argument("--zero-init-dynamics", action="store_true")
     p.add_argument("--warmup-epochs", type=int, default=0)
     p.add_argument("--warmup-lr", type=float, default=1e-4)
@@ -74,6 +78,12 @@ def parse_args(argv: list[str] | None = None) -> TrainConfig:
         default=[],
         help="Benchmark path or 'humaneval' to evaluate after training (repeatable)",
     )
+    p.add_argument(
+        "--spec-decode-benchmark",
+        type=str,
+        help="Benchmark path or 'humaneval' for speculative decoding benchmark",
+    )
+    p.add_argument("--spec-decode-max-tokens", type=int, default=128)
     p.add_argument("--save-checkpoint", action="store_true")
     p.add_argument("--hf-repo", type=str)
     p.add_argument("--seed", type=int, default=42)
@@ -271,6 +281,7 @@ def run_dynamics_warmup_stage(
                         input_ids=torch.tensor([ids], device="cuda"),
                         labels=torch.tensor([labels], device="cuda"),
                         eos_token_id=eos_token_id,
+                        rollout_steps=config.rollout_steps,
                     )
                     mse_loss = losses["mse_loss"]
                     kl_loss = losses["kl_loss"]
@@ -376,6 +387,7 @@ def run_joint_stage(
                             input_ids=torch.tensor([ids], device="cuda"),
                             labels=torch.tensor([labels], device="cuda"),
                             eos_token_id=eos_token_id,
+                            rollout_steps=config.rollout_steps,
                         )
                         ntp_loss = losses["ntp_loss"]
                         mse_loss = losses["mse_loss"]
@@ -446,7 +458,7 @@ def run_training_loop(
     val_batches: list[tuple[list[int], list[int]]] | None = None,
     eos_token_id: int = 50256,
     warmup_batches: list[tuple[list[int], list[int]]] | None = None,
-) -> tuple[int, list[dict[str, Any]]]:
+) -> tuple[int, list[dict[str, Any]], Any]:
     import torch
 
     history: list[dict[str, Any]] = []
@@ -483,7 +495,7 @@ def run_training_loop(
             print(json.dumps(init_record), flush=True)
 
         if total_steps == 0:
-            return 0, history
+            return 0, history, None
 
         dynamics_model = None
         if config.objective == "nextlat":
@@ -493,7 +505,7 @@ def run_training_loop(
                 n_embd=model.config.n_embd,
                 proj_factor=config.proj_factor,
                 zero_init_output=config.zero_init_dynamics,
-            ).to(device="cuda", dtype=next(model.parameters()).dtype)
+            ).to(device="cuda", dtype=torch.float32)
             dynamics_model.train()
 
         step = 0
@@ -544,10 +556,9 @@ def run_training_loop(
                 total_steps=total_steps,
             )
 
-        del dynamics_model
     gc.collect()
     torch.cuda.empty_cache()
-    return step, history
+    return step, history, dynamics_model
 
 
 def run_post_training_evals(
@@ -644,7 +655,7 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
         metadata.update(rank=8, alpha=16, target_modules=["q_proj", "v_proj"])
     (config.output / "config.json").write_text(json.dumps(metadata, indent=2))
 
-    steps, history = run_training_loop(
+    steps, history, dynamics_model = run_training_loop(
         model,
         train_batches,
         config,
@@ -661,10 +672,58 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
             config.output / "checkpoint", safe_serialization=True
         )
         tokenizer.save_pretrained(config.output / "checkpoint")
+        if dynamics_model is not None:
+            torch.save(
+                dynamics_model.state_dict(),
+                config.output / "checkpoint" / "dynamics_model.pt",
+            )
 
     if config.hf_repo:
         model.to(torch.bfloat16).push_to_hub(config.hf_repo, safe_serialization=True)
         tokenizer.push_to_hub(config.hf_repo)
+
+    spec_decode_summary = None
+    if config.spec_decode_benchmark and dynamics_model is not None:
+        from evaluate import prepare_benchmark
+        from nextlat import run_speculative_decoding_benchmark
+
+        if hasattr(model, "gradient_checkpointing_disable"):
+            model.gradient_checkpointing_disable()
+        model = model.to(torch.bfloat16).eval()
+        dynamics_model = dynamics_model.to(torch.bfloat16).eval()
+
+        is_humaneval = config.spec_decode_benchmark.lower() == "humaneval"
+        spec_dir = config.output / "spec_decode_eval"
+        spec_dir.mkdir(parents=True, exist_ok=True)
+        bench_path = None if is_humaneval else Path(config.spec_decode_benchmark)
+        problems, problem_file, _ = prepare_benchmark(spec_dir, bench_path)
+        task_ids = list(problems.keys())
+        prompts = [problems[tid]["prompt"] for tid in task_ids]
+
+        spec_decode_summary = run_speculative_decoding_benchmark(
+            model=model,
+            dynamics_model=dynamics_model,
+            tokenizer=tokenizer,
+            prompts=prompts,
+            max_new_tokens=config.spec_decode_max_tokens,
+            task_ids=task_ids,
+            problem_file=problem_file,
+            output_dir=spec_dir,
+        )
+        spec_decode_summary["benchmark"] = (
+            "humaneval" if is_humaneval else bench_path.name
+        )
+        (config.output / "spec_decode.json").write_text(
+            json.dumps(spec_decode_summary, indent=2)
+        )
+        print(
+            json.dumps({"event": "spec_decode_complete", "spec_decode": spec_decode_summary}),
+            flush=True,
+        )
+
+    del dynamics_model
+    gc.collect()
+    torch.cuda.empty_cache()
 
     evaluations = run_post_training_evals(model, tokenizer, config)
     summary = dict(
@@ -673,6 +732,7 @@ def train_model(config: TrainConfig) -> dict[str, Any]:
         config=metadata,
         final_metrics=history[-1] if history else None,
         evaluations={k: v["scores"] for k, v in evaluations.items()},
+        speculative_decoding=spec_decode_summary,
     )
     (config.output / "summary.json").write_text(json.dumps(summary, indent=2))
     return summary

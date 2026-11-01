@@ -1254,5 +1254,999 @@
         }
       }
     }
+  },
+  "speculative_decoding_test_100": {
+    "spec-joint-rollout1-1000": {
+      "status": "complete",
+      "steps": 500,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "rollout_steps": 1,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [],
+        "spec_decode_benchmark": "/tmp/work/test-100.jsonl",
+        "spec_decode_max_tokens": 128,
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 500,
+        "total_steps": 500,
+        "epoch": 1,
+        "examples_seen": 1000,
+        "answer_token_nll": 0.3535903960079342,
+        "grad_norm": 4.620834827423096,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.18327740190865158,
+        "nextlat_kl_loss": 0.5644317798800282,
+        "total_loss": 0.44668904233288453,
+        "val_answer_token_nll": 0.269223831124649
+      },
+      "evaluations": {},
+      "speculative_decoding": {
+        "tasks": 100,
+        "max_new_tokens": 128,
+        "greedy_baseline": {
+          "total_tokens": 7095,
+          "target_forwards": 7095,
+          "elapsed_seconds": 135.61381350399972,
+          "tokens_per_sec": 52.317679273806014,
+          "tokens_per_target_forward": 1.0
+        },
+        "speculative": {
+          "k=1": {
+            "draft_k": 1,
+            "total_tokens": 7047,
+            "target_forwards": 3970,
+            "draft_steps": 3870,
+            "draft_tokens_proposed": 3870,
+            "draft_tokens_accepted": 3131,
+            "overall_acceptance_rate": 0.8090439276485788,
+            "mean_accepted_per_step": 0.8090439276485788,
+            "tokens_per_target_forward": 1.7750629722921913,
+            "forward_pass_reduction_factor": 1.7871536523929472,
+            "acceptance_rate_by_pos": [
+              0.8090439276485788
+            ],
+            "elapsed_seconds": 80.87709893600027,
+            "tokens_per_sec": 87.13220544144936,
+            "speedup_vs_greedy": 1.6654447722239467,
+            "exact_token_match_rate": 0.93
+          },
+          "k=2": {
+            "draft_k": 2,
+            "total_tokens": 7101,
+            "target_forwards": 3552,
+            "draft_steps": 3452,
+            "draft_tokens_proposed": 6863,
+            "draft_tokens_accepted": 3593,
+            "overall_acceptance_rate": 0.5235319830977706,
+            "mean_accepted_per_step": 1.040845886442642,
+            "tokens_per_target_forward": 1.9991554054054055,
+            "forward_pass_reduction_factor": 1.9974662162162162,
+            "acceptance_rate_by_pos": [
+              0.7746234067207416,
+              0.2694224567575491
+            ],
+            "elapsed_seconds": 73.20315674399978,
+            "tokens_per_sec": 97.0040134311837,
+            "speedup_vs_greedy": 1.8541344871876009,
+            "exact_token_match_rate": 0.9
+          },
+          "k=3": {
+            "draft_k": 3,
+            "total_tokens": 7105,
+            "target_forwards": 3354,
+            "draft_steps": 3254,
+            "draft_tokens_proposed": 9650,
+            "draft_tokens_accepted": 3809,
+            "overall_acceptance_rate": 0.39471502590673574,
+            "mean_accepted_per_step": 1.170559311616472,
+            "tokens_per_target_forward": 2.118366129994037,
+            "forward_pass_reduction_factor": 2.1153846153846154,
+            "acceptance_rate_by_pos": [
+              0.7566072526121697,
+              0.2791133312519513,
+              0.14187284685248983
+            ],
+            "elapsed_seconds": 70.34070451799971,
+            "tokens_per_sec": 101.00837130770958,
+            "speedup_vs_greedy": 1.930673774329314,
+            "exact_token_match_rate": 0.92
+          },
+          "k=4": {
+            "draft_k": 4,
+            "total_tokens": 7032,
+            "target_forwards": 3300,
+            "draft_steps": 3200,
+            "draft_tokens_proposed": 12611,
+            "draft_tokens_accepted": 3790,
+            "overall_acceptance_rate": 0.3005312822139402,
+            "mean_accepted_per_step": 1.184375,
+            "tokens_per_target_forward": 2.130909090909091,
+            "forward_pass_reduction_factor": 2.15,
+            "acceptance_rate_by_pos": [
+              0.7553125,
+              0.24500158679784195,
+              0.10789306174411203,
+              0.08402822322001283
+            ],
+            "elapsed_seconds": 70.17183035300025,
+            "tokens_per_sec": 100.21115260390728,
+            "speedup_vs_greedy": 1.9154357378783844,
+            "exact_token_match_rate": 0.89
+          }
+        }
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/epbmsoox"
+    },
+    "spec-frozen-drafter-1000": {
+      "status": "complete",
+      "steps": 500,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "rollout_steps": 3,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 2,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 0,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [],
+        "spec_decode_benchmark": "/tmp/work/test-100.jsonl",
+        "spec_decode_max_tokens": 128,
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.bfloat16"
+      },
+      "final_metrics": {
+        "phase": "dynamics_warmup",
+        "step": 500,
+        "total_steps": 500,
+        "epoch": 2,
+        "examples_seen": 2000,
+        "grad_norm": 2.9411447048187256,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.5664411421539715,
+        "nextlat_kl_loss": 1.3973523758858153,
+        "total_loss": 1.963793513844314
+      },
+      "evaluations": {},
+      "speculative_decoding": {
+        "tasks": 100,
+        "max_new_tokens": 128,
+        "greedy_baseline": {
+          "total_tokens": 12757,
+          "target_forwards": 12757,
+          "elapsed_seconds": 230.93366753399977,
+          "tokens_per_sec": 55.24097086502911,
+          "tokens_per_target_forward": 1.0
+        },
+        "speculative": {
+          "k=1": {
+            "draft_k": 1,
+            "total_tokens": 12757,
+            "target_forwards": 9395,
+            "draft_steps": 9295,
+            "draft_tokens_proposed": 9295,
+            "draft_tokens_accepted": 3384,
+            "overall_acceptance_rate": 0.36406670252824097,
+            "mean_accepted_per_step": 0.36406670252824097,
+            "tokens_per_target_forward": 1.3578499201703034,
+            "forward_pass_reduction_factor": 1.3578499201703034,
+            "acceptance_rate_by_pos": [
+              0.36406670252824097
+            ],
+            "elapsed_seconds": 182.06031160399976,
+            "tokens_per_sec": 70.07018656404264,
+            "speedup_vs_greedy": 1.2684459644137305,
+            "exact_token_match_rate": 0.77
+          },
+          "k=2": {
+            "draft_k": 2,
+            "total_tokens": 12757,
+            "target_forwards": 8603,
+            "draft_steps": 8503,
+            "draft_tokens_proposed": 16936,
+            "draft_tokens_accepted": 4181,
+            "overall_acceptance_rate": 0.24687057156353331,
+            "mean_accepted_per_step": 0.49170880865576855,
+            "tokens_per_target_forward": 1.482854818086714,
+            "forward_pass_reduction_factor": 1.482854818086714,
+            "acceptance_rate_by_pos": [
+              0.31553569328472303,
+              0.1776354796632278
+            ],
+            "elapsed_seconds": 170.00328657600028,
+            "tokens_per_sec": 75.03972574257827,
+            "speedup_vs_greedy": 1.3584070766229595,
+            "exact_token_match_rate": 0.75
+          },
+          "k=3": {
+            "draft_k": 3,
+            "total_tokens": 12757,
+            "target_forwards": 8189,
+            "draft_steps": 8089,
+            "draft_tokens_proposed": 24067,
+            "draft_tokens_accepted": 4597,
+            "overall_acceptance_rate": 0.1910084347862218,
+            "mean_accepted_per_step": 0.5683026332055878,
+            "tokens_per_target_forward": 1.557821467822689,
+            "forward_pass_reduction_factor": 1.557821467822689,
+            "acceptance_rate_by_pos": [
+              0.30448757572011376,
+              0.16049844236760125,
+              0.10637495284798189
+            ],
+            "elapsed_seconds": 166.5113988419996,
+            "tokens_per_sec": 76.61337355111012,
+            "speedup_vs_greedy": 1.3868940453327736,
+            "exact_token_match_rate": 0.78
+          },
+          "k=4": {
+            "draft_k": 4,
+            "total_tokens": 12757,
+            "target_forwards": 8203,
+            "draft_steps": 8103,
+            "draft_tokens_proposed": 31999,
+            "draft_tokens_accepted": 4579,
+            "overall_acceptance_rate": 0.14309822181943185,
+            "mean_accepted_per_step": 0.5650993459212638,
+            "tokens_per_target_forward": 1.5551627453370718,
+            "forward_pass_reduction_factor": 1.5551627453370718,
+            "acceptance_rate_by_pos": [
+              0.27866222386770334,
+              0.1391964174648588,
+              0.09305538113776216,
+              0.058398783886496074
+            ],
+            "elapsed_seconds": 171.5267161249982,
+            "tokens_per_sec": 74.37325384754337,
+            "speedup_vs_greedy": 1.3463422652230421,
+            "exact_token_match_rate": 0.73
+          }
+        }
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/gtotav6g"
+    },
+    "spec-joint-rollout3-1000": {
+      "status": "complete",
+      "steps": 500,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "rollout_steps": 3,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [
+          "/tmp/work/test-100.jsonl",
+          "humaneval"
+        ],
+        "spec_decode_benchmark": "/tmp/work/test-100.jsonl",
+        "spec_decode_max_tokens": 128,
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 500,
+        "total_steps": 500,
+        "epoch": 1,
+        "examples_seen": 1000,
+        "answer_token_nll": 0.3600741346161087,
+        "grad_norm": 4.344668865203857,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.1938659647842506,
+        "nextlat_kl_loss": 0.8885356379793835,
+        "total_loss": 0.4877009170395988,
+        "val_answer_token_nll": 0.26957741592221485
+      },
+      "evaluations": {
+        "test_100": {
+          "pass@1": 0.237,
+          "pass@10": 0.39133116109896293
+        },
+        "humaneval": {
+          "pass@1": 0.09908536585365854,
+          "pass@10": 0.15232790221935433
+        }
+      },
+      "speculative_decoding": {
+        "tasks": 100,
+        "max_new_tokens": 128,
+        "greedy_baseline": {
+          "total_tokens": 6850,
+          "target_forwards": 6850,
+          "elapsed_seconds": 142.6727359939996,
+          "tokens_per_sec": 48.01197616542583,
+          "tokens_per_target_forward": 1.0
+        },
+        "speculative": {
+          "k=1": {
+            "draft_k": 1,
+            "total_tokens": 6897,
+            "target_forwards": 3944,
+            "draft_steps": 3844,
+            "draft_tokens_proposed": 3844,
+            "draft_tokens_accepted": 3000,
+            "overall_acceptance_rate": 0.7804370447450573,
+            "mean_accepted_per_step": 0.7804370447450573,
+            "tokens_per_target_forward": 1.7487322515212982,
+            "forward_pass_reduction_factor": 1.736815415821501,
+            "acceptance_rate_by_pos": [
+              0.7804370447450573
+            ],
+            "elapsed_seconds": 87.31949541899928,
+            "tokens_per_sec": 78.98579769506235,
+            "speedup_vs_greedy": 1.6451269871274585,
+            "exact_token_match_rate": 0.94
+          },
+          "k=2": {
+            "draft_k": 2,
+            "total_tokens": 6882,
+            "target_forwards": 3131,
+            "draft_steps": 3031,
+            "draft_tokens_proposed": 6032,
+            "draft_tokens_accepted": 3800,
+            "overall_acceptance_rate": 0.629973474801061,
+            "mean_accepted_per_step": 1.253711646321346,
+            "tokens_per_target_forward": 2.198019801980198,
+            "forward_pass_reduction_factor": 2.1877994251038007,
+            "acceptance_rate_by_pos": [
+              0.7363906301550643,
+              0.5224925024991669
+            ],
+            "elapsed_seconds": 69.63469076100046,
+            "tokens_per_sec": 98.83005043592908,
+            "speedup_vs_greedy": 2.058445794761894,
+            "exact_token_match_rate": 0.94
+          },
+          "k=3": {
+            "draft_k": 3,
+            "total_tokens": 6846,
+            "target_forwards": 2735,
+            "draft_steps": 2635,
+            "draft_tokens_proposed": 7827,
+            "draft_tokens_accepted": 4177,
+            "overall_acceptance_rate": 0.5336655168008176,
+            "mean_accepted_per_step": 1.5851992409867173,
+            "tokens_per_target_forward": 2.5031078610603292,
+            "forward_pass_reduction_factor": 2.504570383912249,
+            "acceptance_rate_by_pos": [
+              0.718785578747628,
+              0.5055534278054385,
+              0.37311119721038355
+            ],
+            "elapsed_seconds": 61.55631050100067,
+            "tokens_per_sec": 111.21524250367004,
+            "speedup_vs_greedy": 2.3164062674795267,
+            "exact_token_match_rate": 0.95
+          },
+          "k=4": {
+            "draft_k": 4,
+            "total_tokens": 6800,
+            "target_forwards": 2595,
+            "draft_steps": 2495,
+            "draft_tokens_proposed": 9810,
+            "draft_tokens_accepted": 4268,
+            "overall_acceptance_rate": 0.43506625891946993,
+            "mean_accepted_per_step": 1.71062124248497,
+            "tokens_per_target_forward": 2.6204238921001926,
+            "forward_pass_reduction_factor": 2.6396917148362236,
+            "acceptance_rate_by_pos": [
+              0.6969939879759519,
+              0.45995145631067963,
+              0.3423312883435583,
+              0.23144286905754796
+            ],
+            "elapsed_seconds": 59.35996299600049,
+            "tokens_per_sec": 114.55532747650408,
+            "speedup_vs_greedy": 2.3859740136878003,
+            "exact_token_match_rate": 0.91
+          }
+        }
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/utoq9x6z"
+    }
+  },
+  "speculative_decoding_humaneval": {
+    "spec-humaneval-rollout3-1000": {
+      "status": "complete",
+      "steps": 500,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "rollout_steps": 3,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [],
+        "spec_decode_benchmark": "humaneval",
+        "spec_decode_max_tokens": 128,
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 500,
+        "total_steps": 500,
+        "epoch": 1,
+        "examples_seen": 1000,
+        "answer_token_nll": 0.3600741346161087,
+        "grad_norm": 4.344668865203857,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.1938659647842506,
+        "nextlat_kl_loss": 0.8885356379793835,
+        "total_loss": 0.4877009170395988,
+        "val_answer_token_nll": 0.26957741592221485
+      },
+      "evaluations": {},
+      "speculative_decoding": {
+        "tasks": 164,
+        "max_new_tokens": 128,
+        "greedy_baseline": {
+          "total_tokens": 14241,
+          "target_forwards": 14241,
+          "elapsed_seconds": 273.4618251589997,
+          "tokens_per_sec": 52.07673865161915,
+          "tokens_per_target_forward": 1.0,
+          "pass@1": 0.08536585365853659
+        },
+        "speculative": {
+          "k=1": {
+            "draft_k": 1,
+            "total_tokens": 14127,
+            "target_forwards": 7919,
+            "draft_steps": 7755,
+            "draft_tokens_proposed": 7755,
+            "draft_tokens_accepted": 6290,
+            "overall_acceptance_rate": 0.8110896196002579,
+            "mean_accepted_per_step": 0.8110896196002579,
+            "tokens_per_target_forward": 1.7839373658290187,
+            "forward_pass_reduction_factor": 1.7983331228690491,
+            "acceptance_rate_by_pos": [
+              0.8110896196002579
+            ],
+            "elapsed_seconds": 162.17587707700034,
+            "tokens_per_sec": 87.10913271825603,
+            "speedup_vs_greedy": 1.6727071428377105,
+            "exact_token_match_rate": 0.8658536585365854,
+            "pass@1": 0.08536585365853659
+          },
+          "k=2": {
+            "draft_k": 2,
+            "total_tokens": 13998,
+            "target_forwards": 6052,
+            "draft_steps": 5888,
+            "draft_tokens_proposed": 11733,
+            "draft_tokens_accepted": 8036,
+            "overall_acceptance_rate": 0.684905821188102,
+            "mean_accepted_per_step": 1.3648097826086956,
+            "tokens_per_target_forward": 2.3129543952412424,
+            "forward_pass_reduction_factor": 2.3531064111037674,
+            "acceptance_rate_by_pos": [
+              0.7751358695652174,
+              0.5940119760479042
+            ],
+            "elapsed_seconds": 125.24860629399984,
+            "tokens_per_sec": 111.76172265855055,
+            "speedup_vs_greedy": 2.1460968092915644,
+            "exact_token_match_rate": 0.8719512195121951,
+            "pass@1": 0.09146341463414634
+          },
+          "k=3": {
+            "draft_k": 3,
+            "total_tokens": 14309,
+            "target_forwards": 5326,
+            "draft_steps": 5162,
+            "draft_tokens_proposed": 15349,
+            "draft_tokens_accepted": 9074,
+            "overall_acceptance_rate": 0.5911785784090169,
+            "mean_accepted_per_step": 1.757845796203022,
+            "tokens_per_target_forward": 2.6866316184754035,
+            "forward_pass_reduction_factor": 2.6738640630867443,
+            "acceptance_rate_by_pos": [
+              0.7669507942657885,
+              0.5731302479984378,
+              0.4303197789182787
+            ],
+            "elapsed_seconds": 111.74388401299939,
+            "tokens_per_sec": 128.05175089793198,
+            "speedup_vs_greedy": 2.458904958595187,
+            "exact_token_match_rate": 0.8719512195121951,
+            "pass@1": 0.09146341463414634
+          },
+          "k=4": {
+            "draft_k": 4,
+            "total_tokens": 14078,
+            "target_forwards": 4953,
+            "draft_steps": 4789,
+            "draft_tokens_proposed": 18878,
+            "draft_tokens_accepted": 9222,
+            "overall_acceptance_rate": 0.4885051382561712,
+            "mean_accepted_per_step": 1.925662977657131,
+            "tokens_per_target_forward": 2.842317787199677,
+            "forward_pass_reduction_factor": 2.8752271350696548,
+            "acceptance_rate_by_pos": [
+              0.7300062643558154,
+              0.5324074074074074,
+              0.3965921192758253,
+              0.2873761309780267
+            ],
+            "elapsed_seconds": 105.69694240799959,
+            "tokens_per_sec": 133.19212154366463,
+            "speedup_vs_greedy": 2.5576125731430275,
+            "exact_token_match_rate": 0.8902439024390244,
+            "pass@1": 0.09146341463414634
+          }
+        },
+        "benchmark": "humaneval"
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/51g4bv0c"
+    },
+    "spec-humaneval-rollout1-1000": {
+      "status": "complete",
+      "steps": 500,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "rollout_steps": 1,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 1,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 1,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [],
+        "spec_decode_benchmark": "humaneval",
+        "spec_decode_max_tokens": 128,
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "f6452c8ec83fed4f56e71003da5d4123e3284d9dfbcdd87e0f60985d16b7ba82",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.float32"
+      },
+      "final_metrics": {
+        "phase": "sft",
+        "step": 500,
+        "total_steps": 500,
+        "epoch": 1,
+        "examples_seen": 1000,
+        "answer_token_nll": 0.3535903960079342,
+        "grad_norm": 4.620834827423096,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.18327740190865158,
+        "nextlat_kl_loss": 0.5644317798800282,
+        "total_loss": 0.44668904233288453,
+        "val_answer_token_nll": 0.269223831124649
+      },
+      "evaluations": {},
+      "speculative_decoding": {
+        "tasks": 164,
+        "max_new_tokens": 128,
+        "greedy_baseline": {
+          "total_tokens": 14226,
+          "target_forwards": 14226,
+          "elapsed_seconds": 274.45687273499993,
+          "tokens_per_sec": 51.833280246313315,
+          "tokens_per_target_forward": 1.0,
+          "pass@1": 0.08536585365853659
+        },
+        "speculative": {
+          "k=1": {
+            "draft_k": 1,
+            "total_tokens": 14182,
+            "target_forwards": 7861,
+            "draft_steps": 7697,
+            "draft_tokens_proposed": 7697,
+            "draft_tokens_accepted": 6397,
+            "overall_acceptance_rate": 0.8311030271534364,
+            "mean_accepted_per_step": 0.8311030271534364,
+            "tokens_per_target_forward": 1.8040961709706145,
+            "forward_pass_reduction_factor": 1.8096934232285968,
+            "acceptance_rate_by_pos": [
+              0.8311030271534364
+            ],
+            "elapsed_seconds": 160.82035030400084,
+            "tokens_per_sec": 88.18535697249494,
+            "speedup_vs_greedy": 1.7013269573801901,
+            "exact_token_match_rate": 0.9024390243902439,
+            "pass@1": 0.08536585365853659
+          },
+          "k=2": {
+            "draft_k": 2,
+            "total_tokens": 14252,
+            "target_forwards": 6883,
+            "draft_steps": 6719,
+            "draft_tokens_proposed": 13369,
+            "draft_tokens_accepted": 7445,
+            "overall_acceptance_rate": 0.5568853317376019,
+            "mean_accepted_per_step": 1.10805179342164,
+            "tokens_per_target_forward": 2.070608746186256,
+            "forward_pass_reduction_factor": 2.0668313235507774,
+            "acceptance_rate_by_pos": [
+              0.8025003720791785,
+              0.3087218045112782
+            ],
+            "elapsed_seconds": 141.8096953780007,
+            "tokens_per_sec": 100.5008857963526,
+            "speedup_vs_greedy": 1.938925827552672,
+            "exact_token_match_rate": 0.9024390243902439,
+            "pass@1": 0.08536585365853659
+          },
+          "k=3": {
+            "draft_k": 3,
+            "total_tokens": 14230,
+            "target_forwards": 6431,
+            "draft_steps": 6267,
+            "draft_tokens_proposed": 18617,
+            "draft_tokens_accepted": 7879,
+            "overall_acceptance_rate": 0.42321534081753237,
+            "mean_accepted_per_step": 1.257220360619116,
+            "tokens_per_target_forward": 2.2127196392473953,
+            "forward_pass_reduction_factor": 2.212097651998134,
+            "acceptance_rate_by_pos": [
+              0.778362853039732,
+              0.32067851373182554,
+              0.16493506493506493
+            ],
+            "elapsed_seconds": 134.23962375300175,
+            "tokens_per_sec": 106.00446874153133,
+            "speedup_vs_greedy": 2.0451043854024844,
+            "exact_token_match_rate": 0.8963414634146342,
+            "pass@1": 0.08536585365853659
+          },
+          "k=4": {
+            "draft_k": 4,
+            "total_tokens": 14325,
+            "target_forwards": 6391,
+            "draft_steps": 6227,
+            "draft_tokens_proposed": 24611,
+            "draft_tokens_accepted": 8018,
+            "overall_acceptance_rate": 0.32578928121571654,
+            "mean_accepted_per_step": 1.2876184358439056,
+            "tokens_per_target_forward": 2.241433265529651,
+            "forward_pass_reduction_factor": 2.2259427319668283,
+            "acceptance_rate_by_pos": [
+              0.7812750923398105,
+              0.28680532986675333,
+              0.12718367346938775,
+              0.09975429975429975
+            ],
+            "elapsed_seconds": 136.20803714900148,
+            "tokens_per_sec": 105.17000538176403,
+            "speedup_vs_greedy": 2.0290053973430386,
+            "exact_token_match_rate": 0.8902439024390244,
+            "pass@1": 0.08536585365853659
+          }
+        },
+        "benchmark": "humaneval"
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/mt54tctb"
+    },
+    "spec-humaneval-frozen-1000": {
+      "status": "complete",
+      "steps": 500,
+      "config": {
+        "train": "/tmp/work/train.jsonl",
+        "warmup_train": "/tmp/work/warmup.jsonl",
+        "val": "/tmp/work/val-100.jsonl",
+        "output": "/tmp/work/out",
+        "mode": "full",
+        "objective": "nextlat",
+        "lambda_mse": 0.2,
+        "lambda_kl": 0.1,
+        "proj_factor": 0.5,
+        "rollout_steps": 3,
+        "zero_init_dynamics": true,
+        "warmup_epochs": 2,
+        "warmup_lr": 0.0001,
+        "cpt_epochs": 0,
+        "cpt_lr": 5e-06,
+        "epochs": 0,
+        "learning_rate": 1e-05,
+        "accumulation": 4,
+        "val_every": 25,
+        "eval_benchmarks": [],
+        "spec_decode_benchmark": "humaneval",
+        "spec_decode_max_tokens": 128,
+        "save_checkpoint": false,
+        "hf_repo": null,
+        "seed": 42,
+        "model": "EleutherAI/gpt-j-6b",
+        "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+        "train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "warmup_train_sha256": "352673cee26a09558e5a83cc7065f3c326db48cb94915e48021a6f09c31f5e1f",
+        "val_sha256": "73f918c8069b1a1e3f5d584feefb9e5586e0c00b72dd828c74eeb55f00c5c362",
+        "examples": 1000,
+        "warmup_examples": 1000,
+        "val_examples": 100,
+        "dtype": "torch.bfloat16"
+      },
+      "final_metrics": {
+        "phase": "dynamics_warmup",
+        "step": 500,
+        "total_steps": 500,
+        "epoch": 2,
+        "examples_seen": 2000,
+        "grad_norm": 2.9411447048187256,
+        "learning_rate": 0.0,
+        "nextlat_mse_loss": 0.5664411421539715,
+        "nextlat_kl_loss": 1.3973523758858153,
+        "total_loss": 1.963793513844314
+      },
+      "evaluations": {},
+      "speculative_decoding": {
+        "tasks": 164,
+        "max_new_tokens": 128,
+        "greedy_baseline": {
+          "total_tokens": 20967,
+          "target_forwards": 20967,
+          "elapsed_seconds": 378.95386410900045,
+          "tokens_per_sec": 55.32863492313976,
+          "tokens_per_target_forward": 1.0,
+          "pass@1": 0.11585365853658537
+        },
+        "speculative": {
+          "k=1": {
+            "draft_k": 1,
+            "total_tokens": 20967,
+            "target_forwards": 14107,
+            "draft_steps": 13943,
+            "draft_tokens_proposed": 13943,
+            "draft_tokens_accepted": 6911,
+            "overall_acceptance_rate": 0.4956609051136771,
+            "mean_accepted_per_step": 0.4956609051136771,
+            "tokens_per_target_forward": 1.4862834054015737,
+            "forward_pass_reduction_factor": 1.4862834054015737,
+            "acceptance_rate_by_pos": [
+              0.4956609051136771
+            ],
+            "elapsed_seconds": 273.01911492700026,
+            "tokens_per_sec": 76.79682063875326,
+            "speedup_vs_greedy": 1.3880122064358937,
+            "exact_token_match_rate": 0.7987804878048781,
+            "pass@1": 0.12195121951219512
+          },
+          "k=2": {
+            "draft_k": 2,
+            "total_tokens": 20967,
+            "target_forwards": 12324,
+            "draft_steps": 12160,
+            "draft_tokens_proposed": 24222,
+            "draft_tokens_accepted": 8704,
+            "overall_acceptance_rate": 0.3593427462637272,
+            "mean_accepted_per_step": 0.7157894736842105,
+            "tokens_per_target_forward": 1.7013145082765335,
+            "forward_pass_reduction_factor": 1.7013145082765335,
+            "acceptance_rate_by_pos": [
+              0.4393092105263158,
+              0.2787265793400763
+            ],
+            "elapsed_seconds": 245.12471549299812,
+            "tokens_per_sec": 85.53605032373373,
+            "speedup_vs_greedy": 1.5459635041160307,
+            "exact_token_match_rate": 0.7560975609756098,
+            "pass@1": 0.12195121951219512
+          },
+          "k=3": {
+            "draft_k": 3,
+            "total_tokens": 20946,
+            "target_forwards": 11494,
+            "draft_steps": 11330,
+            "draft_tokens_proposed": 33702,
+            "draft_tokens_accepted": 9517,
+            "overall_acceptance_rate": 0.2823868019702095,
+            "mean_accepted_per_step": 0.839982347749338,
+            "tokens_per_target_forward": 1.8223420915260136,
+            "forward_pass_reduction_factor": 1.824169131720898,
+            "acceptance_rate_by_pos": [
+              0.4119152691968226,
+              0.25166918899670615,
+              0.18161414848729687
+            ],
+            "elapsed_seconds": 236.29869006700005,
+            "tokens_per_sec": 88.64204873104028,
+            "speedup_vs_greedy": 1.602100772126009,
+            "exact_token_match_rate": 0.7317073170731707,
+            "pass@1": 0.12195121951219512
+          },
+          "k=4": {
+            "draft_k": 4,
+            "total_tokens": 20967,
+            "target_forwards": 11154,
+            "draft_steps": 10990,
+            "draft_tokens_proposed": 43378,
+            "draft_tokens_accepted": 9884,
+            "overall_acceptance_rate": 0.22785743925492186,
+            "mean_accepted_per_step": 0.8993630573248408,
+            "tokens_per_target_forward": 1.8797740720817644,
+            "forward_pass_reduction_factor": 1.8797740720817644,
+            "acceptance_rate_by_pos": [
+              0.38944494995450407,
+              0.23459737397851438,
+              0.1727331666203575,
+              0.11065420560747663
+            ],
+            "elapsed_seconds": 230.48819901900129,
+            "tokens_per_sec": 90.96778095034486,
+            "speedup_vs_greedy": 1.6441356465185437,
+            "exact_token_match_rate": 0.725609756097561,
+            "pass@1": 0.12195121951219512
+          }
+        },
+        "benchmark": "humaneval"
+      },
+      "wandb_url": "https://forge.coreweave.com/wandb/ivanleomk-experiments/gptj-code-sft/runs/1d3cupc4"
+    }
+  },
+  "spec_joint_rollout3_1000_paired_bootstrap": {
+    "vs_full_sft_1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": -0.015500000000000003,
+          "ci95_low": -0.063,
+          "ci95_high": 0.03299999999999999
+        },
+        "pass@10": {
+          "delta": -0.02874564290198965,
+          "ci95_low": -0.10355225270085949,
+          "ci95_high": 0.04305002273268526
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": -0.00975609756097561,
+          "ci95_low": -0.027134146341463404,
+          "ci95_high": 0.0067073170731707325
+        },
+        "pass@10": {
+          "delta": 0.0034009258882776957,
+          "ci95_low": -0.0251900793082927,
+          "ci95_high": 0.03149087471465332
+        }
+      }
+    },
+    "vs_nextlat_warmup_sft_1000": {
+      "test_100": {
+        "tasks": 100,
+        "pass@1": {
+          "delta": 0.006999999999999999,
+          "ci95_low": -0.017999999999999995,
+          "ci95_high": 0.0335
+        },
+        "pass@10": {
+          "delta": -0.01993748511550369,
+          "ci95_low": -0.062321440169737376,
+          "ci95_high": 0.023237026131762973
+        }
+      },
+      "humaneval": {
+        "tasks": 164,
+        "pass@1": {
+          "delta": 0.007317073170731706,
+          "ci95_low": 0.00030487804878048336,
+          "ci95_high": 0.015243902439024388
+        },
+        "pass@10": {
+          "delta": 0.014025881993865081,
+          "ci95_low": -0.001340726780581797,
+          "ci95_high": 0.033340809684916005
+        }
+      }
+    }
   }
 }

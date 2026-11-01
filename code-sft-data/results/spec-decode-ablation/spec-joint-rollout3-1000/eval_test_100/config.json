@@ -1,0 +1,27 @@
+{
+  "output": "/tmp/work/out/eval_test_100",
+  "adapter": null,
+  "benchmark": "/tmp/work/test-100.jsonl",
+  "samples": 20,
+  "batch_size": 10,
+  "max_new_tokens": 512,
+  "seed": 42,
+  "execute_in_sandbox": true,
+  "model": "EleutherAI/gpt-j-6b",
+  "revision": "47e169305d2e8376be1d31e765533382721b2cc1",
+  "temperature": 0.2,
+  "top_p": 0.95,
+  "top_k": 0,
+  "stops": [
+    "\nclass",
+    "\ndef",
+    "\n#",
+    "\nif",
+    "\nprint"
+  ],
+  "torch": "2.8.0+cu128",
+  "transformers": "4.56.2",
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "adapter_files_sha256": {},
+  "dataset_sha256": "c1a00111c61b805ba099f432d93e3636afadcf302f3fd18bc1e5c3b6223c8710"
+}
