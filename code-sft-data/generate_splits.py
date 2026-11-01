@@ -32,6 +32,12 @@ MODEL_REV = "47e169305d2e8376be1d31e765533382721b2cc1"
 
 
 def extract(row: dict[str, Any]) -> tuple[str, str, str]:
+    """Return instruction prompt, normalized solution and solution-body hash.
+
+    Parse one fenced synchronous function without executing it. Reject unsupported
+    structure and selected dependency/dynamic calls with stable reason codes.
+    This is a static dataset filter, not a sandbox or correctness check.
+    """
     blocks = re.findall(r"```(?:python|py)?\s*\n(.*?)```", row["response"], re.S)
     if len(blocks) != 1:
         raise ValueError("not_one_code_block")
